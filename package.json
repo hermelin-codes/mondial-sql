@@ -1,0 +1,17 @@
+{
+  "name": "sql-trainer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SQL üben mit der MONDIAL-Datenbank, direkt im Browser.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "node build.mjs",
+    "preview": "node build.mjs && node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "sql-formatter": "15.10.0",
+    "sql.js": "1.10.3"
+  }
+}
