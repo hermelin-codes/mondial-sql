@@ -110,14 +110,33 @@
     border-radius:10px;
     overflow:hidden;
   }
-  textarea{
-    width:100%; min-height:150px;
-    background:var(--bg); color:var(--text);
-    border:none; outline:none; resize:vertical;
-    padding:20px 20px 10px;
+  /* Syntax-Highlighting: durchsichtiges Textfeld ueber einer gefaerbten Kopie des Textes.
+     Beide muessen exakt dieselben Schrift- und Umbruchwerte haben, sonst verrutscht der Text. */
+  .editor-input{position:relative; background:var(--bg);}
+  #sql-highlight, #sql-input{
     font-family:var(--mono); font-size:14.5px; line-height:1.65;
+    padding:20px 20px 10px; margin:0; border:0;
+    letter-spacing:normal; tab-size:4;
+    white-space:pre-wrap; overflow-wrap:break-word; word-break:normal;
   }
+  #sql-highlight{
+    position:absolute; inset:0; overflow:hidden; pointer-events:none;
+    color:var(--text);
+  }
+  textarea{
+    display:block; position:relative;
+    width:100%; min-height:150px;
+    background:transparent; color:transparent; caret-color:var(--text);
+    outline:none; resize:none; overflow:hidden;
+    -webkit-appearance:none; appearance:none; border-radius:0;
+  }
+  textarea::selection{background:rgba(60,110,220,0.22); color:transparent;}
   ::placeholder{color:var(--muted-2);}
+  .sql-kw{color:#2b5fd9;}
+  .sql-fn{color:#8e3fc9;}
+  .sql-str{color:#1e8449;}
+  .sql-num{color:#c25b0a;}
+  .sql-com{color:#9a9a9a;}
   .editor-footer{
     display:flex; align-items:center; gap:12px;
     padding:0 18px 16px;
@@ -280,7 +299,10 @@
   <div class="work-row">
     <div class="editor-col">
       <div class="editor-wrap">
-        <textarea id="sql-input" placeholder="SELECT * FROM Country WHERE Population > 50000000 ORDER BY Population DESC;" spellcheck="false"></textarea>
+        <div class="editor-input">
+          <pre id="sql-highlight" aria-hidden="true"></pre>
+          <textarea id="sql-input" placeholder="SELECT * FROM Country WHERE Population > 50000000 ORDER BY Population DESC;" spellcheck="false"></textarea>
+        </div>
         <div class="editor-footer">
           <button class="run" id="run-btn">Ausführen</button>
           <span class="hint">⌘/Strg + Enter</span>
@@ -379,6 +401,7 @@ function renderTableList(tables) {
       e.preventDefault();
       e.stopPropagation();
       document.getElementById('sql-input').value = 'SELECT * FROM ' + t.name + ' LIMIT 20;';
+      syncEditor();
       document.querySelector('.tables-toggle').removeAttribute('open');
     };
     summary.appendChild(insertBtn);
@@ -1028,7 +1051,64 @@ function runQuery() {
   }
 }
 
+// ---------- Syntax-Highlighting ----------
+const SQL_HL_KEYWORDS = new Set((
+  'select from where group by order having limit offset distinct all as on using ' +
+  'join inner left right full outer cross natural union intersect except ' +
+  'and or not in exists between like glob is null isnull notnull escape ' +
+  'case when then else end asc desc with recursive over partition ' +
+  'insert into values update set delete create drop alter table view index ' +
+  'primary key default collate cast true false nulls first last ' +
+  'begin commit rollback pragma explain'
+).split(' '));
+
+const SQL_HL_RE = /(\/\*[\s\S]*?(?:\*\/|$))|(--[^\n]*)|('(?:[^']|'')*(?:'|$))|("(?:[^"]|"")*(?:"|$))|(\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b|\.\d+\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
+
+function sqlEsc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function highlightSql(text) {
+  const re = new RegExp(SQL_HL_RE.source, 'g');
+  let out = '';
+  let last = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m[0] === '') { re.lastIndex++; continue; }
+    out += sqlEsc(text.slice(last, m.index));
+    const tok = sqlEsc(m[0]);
+    if (m[1] || m[2]) out += '<span class="sql-com">' + tok + '</span>';
+    else if (m[3]) out += '<span class="sql-str">' + tok + '</span>';
+    else if (m[4]) out += tok; // "Bezeichner in Anfuehrungszeichen" bleibt normal
+    else if (m[5]) out += '<span class="sql-num">' + tok + '</span>';
+    else if (m[6]) {
+      if (SQL_HL_KEYWORDS.has(m[6].toLowerCase())) {
+        out += '<span class="sql-kw">' + tok + '</span>';
+      } else if (/^\s*\(/.test(text.slice(re.lastIndex, re.lastIndex + 40))) {
+        out += '<span class="sql-fn">' + tok + '</span>';
+      } else {
+        out += tok;
+      }
+    }
+    last = re.lastIndex;
+  }
+  out += sqlEsc(text.slice(last));
+  return out;
+}
+
+function syncEditor() {
+  const ta = document.getElementById('sql-input');
+  const hl = document.getElementById('sql-highlight');
+  // Hoehe waechst mit dem Inhalt, damit nie ein eigener Scrollbalken entsteht
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
+  // abschliessender Zeilenumbruch bleibt sonst unsichtbar
+  hl.innerHTML = highlightSql(ta.value) + '\n';
+}
+window.addEventListener('resize', syncEditor);
+
 document.getElementById('run-btn').addEventListener('click', runQuery);
+document.getElementById('sql-input').addEventListener('input', syncEditor);
 document.getElementById('sql-input').addEventListener('input', (e) => {
   updateViz(e.target.value);
 });
@@ -1059,6 +1139,7 @@ initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1
     updateViz(document.getElementById('sql-input').value);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'block';
+    syncEditor();
   })
   .catch(err => {
     document.getElementById('loading-text').textContent = 'Fehler beim Laden: ' + err.message;
