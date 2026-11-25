@@ -1,5 +1,5 @@
 // Baut die Website nach dist/ (Ausgabeordner für Cloudflare Pages).
-//   node build.mjs                       → https://sql-trainer.pages.dev
+//   node build.mjs                       → https://mondial-sql.pages.dev
 //   SITE_URL=https://example.de node build.mjs
 //
 // Ablauf: Assets kopieren und bündeln, Aufgabenlösungen gegen die Datenbank prüfen,
@@ -160,7 +160,7 @@ function topbar(current, { tables = false } = {}) {
   const link = (href, label, id) =>
     `<a class="nav-link" href="${href}"${current === id ? ' aria-current="page"' : ''}>${label}</a>`;
   return `  <nav class="topbar" aria-label="Hauptnavigation">
-    <a class="brand" href="/">${esc(SITE.name)}</a>
+    <a class="brand" href="/">${esc(SITE.logo)}</a>
     <div class="topbar-right">
       ${link('/aufgaben/', 'Aufgaben', 'aufgaben')}
       ${link('/schema/', 'Schema', 'schema')}

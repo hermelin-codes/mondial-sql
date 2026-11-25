@@ -1,8 +1,8 @@
-# mondial · sql
+# Mondial SQL
 
 **SQL üben mit der MONDIAL-Datenbank, direkt im Browser.**
 
-👉 **Ausprobieren: [sql-trainer.pages.dev](https://sql-trainer.pages.dev)**
+👉 **Ausprobieren: [mondial-sql.pages.dev](https://mondial-sql.pages.dev)**
 
 ![SQL-Editor mit Ergebnistabelle und ER-Diagramm](web/public/og.png)
 
@@ -16,8 +16,8 @@ Viele Datenbank-Vorlesungen üben SQL mit MONDIAL, einer Geodatenbank mit Lände
 - **Formatieren** rückt die Abfrage sauber ein.
 - **Verlauf** speichert deine letzten 50 Abfragen, blättern mit ⌘/Strg + ↑ / ↓.
 - **ChatGPT fragen / Claude fragen** öffnet einen Chat mit deiner Abfrage, der Fehlermeldung und dem passenden Ausschnitt des Schemas.
-- **[Übungsaufgaben](https://sql-trainer.pages.dev/aufgaben/)** mit Hinweisen und geprüften Lösungen, vom SELECT bis zur korrelierten Unterabfrage.
-- **[Schema-Übersicht](https://sql-trainer.pages.dev/schema/)** mit allen Tabellen, Spalten, Schlüsseln und Verknüpfungen.
+- **[Übungsaufgaben](https://mondial-sql.pages.dev/aufgaben/)** mit Hinweisen und geprüften Lösungen, vom SELECT bis zur korrelierten Unterabfrage.
+- **[Schema-Übersicht](https://mondial-sql.pages.dev/schema/)** mit allen Tabellen, Spalten, Schlüsseln und Verknüpfungen.
 - Hell und dunkel umschaltbar.
 
 Die Abfragen laufen in **SQLite**. Falls deine Vorlesung Oracle nutzt: Dort heißt es `MINUS` statt `EXCEPT`, `NVL` statt `IFNULL` und `FETCH FIRST n ROWS ONLY` statt `LIMIT`.
@@ -60,7 +60,7 @@ Beim Build wird jede Musterlösung aus `web/aufgaben.mjs` gegen die Datenbank au
 | Build output directory | `dist` |
 | Umgebungsvariable (optional) | `SITE_URL=https://deine-domain.de` |
 
-`SITE_URL` legt die Adresse für Canonical-Links, Sitemap und Vorschaubild fest. Ohne die Variable gilt `https://sql-trainer.pages.dev`. Die Node-Version steht in `.node-version`.
+`SITE_URL` legt die Adresse für Canonical-Links, Sitemap und Vorschaubild fest. Ohne die Variable gilt `https://mondial-sql.pages.dev`. Die Node-Version steht in `.node-version`.
 
 Vorschaubild und Icons neu erzeugen (braucht Playwright für Python):
 

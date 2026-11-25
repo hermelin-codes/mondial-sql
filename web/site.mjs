@@ -1,10 +1,11 @@
 // Texte und Einstellungen der Website. HTML ist nur dort erlaubt, wo es dabei steht.
 
 export const SITE = {
-  name: 'mondial · sql',
+  name: 'Mondial SQL',
+  logo: 'mondial · sql',   // Schriftzug oben links
   // Basis-URL für Canonical-Links, Sitemap und Vorschaubilder. Beim Build über SITE_URL überschreibbar.
-  url: 'https://sql-trainer.pages.dev',
-  repo: 'https://github.com/hermelin-codes/sql-trainer',
+  url: 'https://mondial-sql.pages.dev',
+  repo: 'https://github.com/hermelin-codes/mondial-sql',
   lang: 'de',
 };
 
