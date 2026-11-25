@@ -3,6 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <title>mondial · sql</title>
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('mondial-theme'); } catch (e) {}
+  if (t !== 'dark' && t !== 'light') {
+    t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
 <style>
   :root{
     --bg:#ffffff;
@@ -14,8 +24,36 @@
     --error:#b3261e;
     --error-bg:#fbf3f2;
     --note-bg:#fafafa;
+    --surface:#ffffff;
+    --on-text:#ffffff;
+    --hl-kw:#2b5fd9;
+    --hl-fn:#8e3fc9;
+    --hl-str:#1e8449;
+    --hl-num:#c25b0a;
+    --hl-com:#9a9a9a;
+    --selection:rgba(60,110,220,0.22);
     --mono:ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
     --sans:-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --bg:#141414;
+    --text:#e8e8e8;
+    --muted:#8a8a8a;
+    --muted-2:#5a5a5a;
+    --border:#2a2a2a;
+    --border-2:#383838;
+    --error:#ff7b72;
+    --error-bg:#2a1615;
+    --note-bg:#1b1b1b;
+    --surface:#1f1f1f;
+    --on-text:#141414;
+    --hl-kw:#7aa2ff;
+    --hl-fn:#d19bff;
+    --hl-str:#7dd492;
+    --hl-num:#f0a35e;
+    --hl-com:#6e6e6e;
+    --selection:rgba(122,162,255,0.30);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -130,24 +168,24 @@
     outline:none; resize:none; overflow:hidden;
     -webkit-appearance:none; appearance:none; border-radius:0;
   }
-  textarea::selection{background:rgba(60,110,220,0.22); color:transparent;}
+  textarea::selection{background:var(--selection); color:transparent;}
   ::placeholder{color:var(--muted-2);}
-  .sql-kw{color:#2b5fd9;}
-  .sql-fn{color:#8e3fc9;}
-  .sql-str{color:#1e8449;}
-  .sql-num{color:#c25b0a;}
-  .sql-com{color:#9a9a9a;}
+  .sql-kw{color:var(--hl-kw);}
+  .sql-fn{color:var(--hl-fn);}
+  .sql-str{color:var(--hl-str);}
+  .sql-num{color:var(--hl-num);}
+  .sql-com{color:var(--hl-com);}
   .editor-footer{
     display:flex; align-items:center; gap:12px;
     padding:0 18px 16px;
   }
   button.run{
-    background:var(--text); color:#fff; border:none;
+    background:var(--text); color:var(--on-text); border:none;
     padding:9px 20px; border-radius:7px;
     font-size:13.5px; font-weight:600; font-family:var(--sans);
     cursor:pointer;
   }
-  button.run:hover{background:#000;}
+  button.run:hover{opacity:0.85;}
   button.run:disabled{opacity:0.4; cursor:default;}
   .hint{font-size:11.5px; color:var(--muted); font-family:var(--mono);}
 
@@ -195,11 +233,26 @@
   table.result-table tr:hover td{background:var(--note-bg);}
   .truncate-note{margin-top:8px; font-size:11.5px; color:var(--muted); font-family:var(--mono);}
 
-  footer{
-    margin-top:60px; padding-top:16px; border-top:1px solid var(--border);
-    font-size:11.5px; color:var(--muted-2); font-family:var(--mono); line-height:1.6;
+  .ask-row{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px;
   }
-  footer code{color:var(--muted);}
+  .ask-label{font-size:11.5px; color:var(--muted); font-family:var(--mono); margin-right:4px;}
+  a.ask-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:7px 14px; border-radius:7px; border:1px solid var(--border-2);
+    font-size:12.5px; font-weight:600; font-family:var(--sans);
+    color:var(--text); text-decoration:none; background:var(--bg);
+  }
+  a.ask-btn:hover{border-color:var(--text);}
+  a.ask-btn .dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  a.ask-btn.gpt .dot{background:#10a37f;}
+  a.ask-btn.claude .dot{background:#d97757;}
+  .topbar-right{display:flex; align-items:baseline; gap:18px;}
+  .theme-toggle{
+    font-family:var(--mono); font-size:12px; color:var(--muted); cursor:pointer;
+    background:none; border:none; padding:0;
+  }
+  .theme-toggle:hover{color:var(--text);}
 
   .viz-tabs{
     display:flex; gap:6px; margin-bottom:14px;
@@ -209,7 +262,7 @@
     background:none; border:1px solid var(--border-2); border-radius:7px; color:var(--muted);
     cursor:pointer;
   }
-  .viz-tab.active{background:var(--text); color:#fff; border-color:var(--text);}
+  .viz-tab.active{background:var(--text); color:var(--on-text); border-color:var(--text);}
   .viz-tab:hover:not(.active){border-color:var(--text); color:var(--text);}
   .viz-panel{
     border:1px solid var(--border-2); border-radius:10px; padding:16px;
@@ -239,13 +292,13 @@
   .pipe-step{
     display:flex; gap:10px; align-items:flex-start;
     padding:9px 12px; border-radius:8px; border:1px solid var(--border-2);
-    background:#fff; opacity:0.45;
+    background:var(--surface); opacity:0.45;
   }
   .pipe-step.active{
     opacity:1; border-color:var(--text);
   }
   .pipe-num{
-    width:18px; height:18px; border-radius:50%; background:var(--border-2); color:#fff;
+    width:18px; height:18px; border-radius:50%; background:var(--border-2); color:var(--on-text);
     font-size:10px; font-family:var(--mono); display:flex; align-items:center; justify-content:center;
     flex-shrink:0; margin-top:1px;
   }
@@ -258,14 +311,14 @@
   .pipe-arrow.active{color:var(--text);}
 
   .er-canvas{
-    border:1px solid var(--border-2); border-radius:8px; background:#fff; overflow:hidden;
+    border:1px solid var(--border-2); border-radius:8px; background:var(--surface); overflow:hidden;
     touch-action:none;
   }
   .er-canvas svg{display:block; cursor:grab;}
   .er-canvas svg:active{cursor:grabbing;}
   .er-controls{display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap;}
   .er-zoom-btn{
-    width:26px; height:26px; border-radius:6px; border:1px solid var(--border-2); background:#fff;
+    width:26px; height:26px; border-radius:6px; border:1px solid var(--border-2); background:var(--surface);
     color:var(--text); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;
     font-family:var(--mono); padding:0;
   }
@@ -290,10 +343,13 @@
 
   <div class="topbar">
     <span class="brand">mondial · sql</span>
-    <details class="tables-toggle">
-      <summary>Tabellen</summary>
-      <div id="table-list" class="table-list"></div>
-    </details>
+    <div class="topbar-right">
+      <button type="button" class="theme-toggle" id="theme-toggle"></button>
+      <details class="tables-toggle">
+        <summary>Tabellen</summary>
+        <div id="table-list" class="table-list"></div>
+      </details>
+    </div>
   </div>
 
   <div class="work-row">
@@ -309,15 +365,16 @@
         </div>
       </div>
 
+      <div class="ask-row">
+        <span class="ask-label">Hilfe:</span>
+        <a class="ask-btn gpt" id="ask-gpt" href="https://chatgpt.com/" target="_blank" rel="noopener"><span class="dot"></span>ChatGPT fragen</a>
+        <a class="ask-btn claude" id="ask-claude" href="https://claude.ai/new" target="_blank" rel="noopener"><span class="dot"></span>Claude fragen</a>
+      </div>
+
       <div class="results-col">
         <div id="status-line" class="status-line" style="display:none;"></div>
         <div id="error-area" class="error-area"></div>
         <div id="results" class="results"></div>
-
-        <footer>
-          MONDIAL-Geodatenbank (CC BY 3.0) · läuft vollständig im Browser, keine Daten verlassen ihn außer beim Klick auf „Erklären"<br>
-          Quelle: <code>github.com/ullenboom/mondial-database</code>
-        </footer>
       </div>
     </div>
 
@@ -477,55 +534,6 @@ function renderResults(results) {
   });
 }
 
-async function explainError(query, errorMessage) {
-  const explainBtn = document.getElementById('explain-btn');
-  if (explainBtn) explainBtn.disabled = true;
-  const errorArea = document.getElementById('error-area');
-  let explainBox = document.getElementById('explain-box');
-  if (!explainBox) {
-    explainBox = document.createElement('div');
-    explainBox.id = 'explain-box';
-    explainBox.className = 'explain-box';
-    errorArea.appendChild(explainBox);
-  }
-  explainBox.textContent = 'Frage wird gestellt…';
-
-  const prompt = `Ein Nutzer übt SQL gegen die MONDIAL-Geodatenbank (SQLite-Dialekt). Seine Abfrage hat folgenden Fehler erzeugt.
-
-Schema (relevante Tabellen):
-${SCHEMA_TEXT}
-
-Abfrage des Nutzers:
-${query}
-
-Fehlermeldung der Datenbank:
-${errorMessage}
-
-Erkläre auf Deutsch, locker und direkt (du-Form, nicht steif), WARUM die Syntax nicht funktioniert. Erkläre das zugrunde liegende SQL-Konzept, das hier nicht stimmt, statt nur die korrigierte Abfrage zu liefern. Gib am Ende einen kurzen Hinweis, wie man es beheben könnte, aber ohne die komplette Lösung vorzukauen, wenn es vermeidbar ist. Maximal 120 Wörter. Keine Code-Blöcke, keine Überschriften, einfacher Fließtext.`;
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await response.json();
-    const textBlocks = (data.content || [])
-      .filter(item => item.type === 'text')
-      .map(item => item.text);
-    const explanation = textBlocks.join('\n').trim() || 'Keine Erklärung erhalten.';
-    explainBox.innerHTML = escapeHtml(explanation).replace(/\n/g, '<br>');
-  } catch (err) {
-    explainBox.textContent = 'Erklärung konnte nicht geladen werden: ' + String(err);
-  } finally {
-    if (explainBtn) explainBtn.disabled = false;
-  }
-}
-
 function showError(query, message) {
   const errorArea = document.getElementById('error-area');
   errorArea.innerHTML = '';
@@ -533,12 +541,6 @@ function showError(query, message) {
   msg.className = 'error-msg';
   msg.textContent = message;
   errorArea.appendChild(msg);
-  const btn = document.createElement('button');
-  btn.className = 'explain';
-  btn.id = 'explain-btn';
-  btn.textContent = 'Erklären';
-  btn.onclick = () => explainError(query, message);
-  errorArea.appendChild(btn);
 }
 
 // ---------- Visualisierung: Tabellenbeziehungen & Abfrage-Ablauf ----------
@@ -796,6 +798,7 @@ function getSelectedColumnsInfo(sql, tableColumns) {
 }
 
 function renderERDiagram(sql) {
+  const ER_COL = erColors();
   const el = document.getElementById('viz-er');
   const usedList = extractUsedTables(sql || '', ALL_TABLE_NAMES);
   const usedSet = new Set(usedList);
@@ -832,7 +835,7 @@ function renderERDiagram(sql) {
     if (!pa || !pb) continue;
     const active = usedSet.has(a) && usedSet.has(b);
     const dim = hasQuery && !active;
-    const stroke = active ? '#b3261e' : (dim ? '#efefef' : '#d8d8d8');
+    const stroke = active ? ER_COL.edgeActive : (dim ? ER_COL.edgeDim : ER_COL.edge);
     const sw = active ? 1.8 : 0.8;
 
     if (a === b) { // Selbstbezug (River.River)
@@ -860,16 +863,16 @@ function renderERDiagram(sql) {
     const cols = TABLE_COLUMNS[name] || [];
     const includedSet = active ? getSelectedColumnsInfo(sql, cols) : null;
 
-    const headFill = active ? '#161616' : '#ffffff';
-    const headText = active ? '#ffffff' : '#161616';
-    const borderCol = active ? '#161616' : '#c9c9c9';
+    const headFill = active ? ER_COL.text : ER_COL.box;
+    const headText = active ? ER_COL.box : ER_COL.text;
+    const borderCol = active ? ER_COL.text : ER_COL.border;
 
     let box = `<g data-table="${escapeHtml(name)}" style="cursor:pointer;">`;
-    box += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="4" fill="#ffffff" stroke="${borderCol}" stroke-width="${active ? 1.4 : 1}" />`;
+    box += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="4" fill="${ER_COL.box}" stroke="${borderCol}" stroke-width="${active ? 1.4 : 1}" />`;
     box += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${ER_HEAD_H}" rx="4" fill="${headFill}" stroke="${borderCol}" stroke-width="${active ? 1.4 : 1}" />`;
     if (p.open) box += `<line x1="${p.x}" y1="${p.y + ER_HEAD_H}" x2="${p.x + p.w}" y2="${p.y + ER_HEAD_H}" stroke="${borderCol}" stroke-width="0.8" />`;
     box += `<text x="${p.x + 8}" y="${p.y + 15}" font-size="10" font-weight="600" font-family="ui-monospace, monospace" fill="${headText}">${escapeHtml(name)}</text>`;
-    if (!p.open) box += `<text x="${p.x + p.w - 8}" y="${p.y + 15}" text-anchor="end" font-size="9" font-family="ui-monospace, monospace" fill="${active ? '#ffffff' : '#bcbcbc'}">${cols.length}</text>`;
+    if (!p.open) box += `<text x="${p.x + p.w - 8}" y="${p.y + 15}" text-anchor="end" font-size="9" font-family="ui-monospace, monospace" fill="${active ? ER_COL.box : ER_COL.count}">${cols.length}</text>`;
 
     if (p.open) {
       cols.forEach((colDef, i) => {
@@ -877,7 +880,7 @@ function renderERDiagram(sql) {
         const colName = spaceIdx === -1 ? colDef : colDef.slice(0, spaceIdx);
         const ty = p.y + ER_HEAD_H + 10 + i * ER_ROW_H;
         const excluded = includedSet && !includedSet.has(colName.toLowerCase());
-        const fill = excluded ? '#c0c0c0' : '#2a2a2a';
+        const fill = excluded ? ER_COL.colOff : ER_COL.col;
         const deco = excluded ? ' text-decoration="line-through"' : '';
         box += `<text x="${p.x + 8}" y="${ty}" font-size="9" font-family="ui-monospace, monospace" fill="${fill}"${deco}>${escapeHtml(colName)}</text>`;
       });
@@ -1015,10 +1018,32 @@ document.querySelectorAll('.viz-tab').forEach(btn => {
   });
 
   container.addEventListener('wheel', (e) => {
-    if (!e.target.closest('svg')) return;
+    const svgEl = e.target.closest('svg');
+    if (!svgEl) return;
     e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 0.87;
-    erZoom = Math.min(3, Math.max(0.4, erZoom * factor));
+    // Zoomstaerke haengt von der Scrollmenge ab statt fest 15 % pro Event.
+    // Touchpads feuern viele kleine Events, Mausraeder wenige grosse.
+    let dy = e.deltaY;
+    if (e.deltaMode === 1) dy *= 16;        // Zeilen -> Pixel
+    else if (e.deltaMode === 2) dy *= 400;  // Seiten -> Pixel
+    dy = Math.max(-100, Math.min(100, dy));
+    // Pinch auf dem Touchpad kommt als Wheel mit ctrlKey und kleinen Werten
+    const speed = e.ctrlKey ? 0.008 : 0.0015;
+    const newZoom = Math.min(3, Math.max(0.4, erZoom * Math.exp(-dy * speed)));
+    if (newZoom === erZoom) return;
+    // Punkt unter dem Mauszeiger bleibt stehen
+    const ctm = svgEl.getScreenCTM();
+    if (ctm) {
+      const pt = svgEl.createSVGPoint();
+      pt.x = e.clientX; pt.y = e.clientY;
+      const m = pt.matrixTransform(ctm.inverse());
+      const cx = ER_VIEWBOX.w / 2, cy = ER_VIEWBOX.h / 2;
+      const px = (m.x - cx - erPanX) / erZoom + cx;
+      const py = (m.y - cy - erPanY) / erZoom + cy;
+      erPanX = m.x - cx - (px - cx) * newZoom;
+      erPanY = m.y - cy - (py - cy) * newZoom;
+    }
+    erZoom = newZoom;
     applyErTransform();
   }, { passive: false });
 
@@ -1038,15 +1063,18 @@ function runQuery() {
   errorArea.innerHTML = '';
   resultsDiv.innerHTML = '';
   statusLine.style.display = 'none';
+  lastRun = null;
   if (!sql) return;
   const start = performance.now();
   try {
     const results = db.exec(sql);
+    lastRun = { sql, error: null, results };
     const elapsed = (performance.now() - start).toFixed(1);
     statusLine.style.display = 'block';
     statusLine.textContent = 'Ausgeführt in ' + elapsed + ' ms.';
     renderResults(results);
   } catch (err) {
+    lastRun = { sql, error: err.message || String(err), results: null };
     showError(sql, err.message || String(err));
   }
 }
@@ -1095,6 +1123,119 @@ function highlightSql(text) {
   out += sqlEsc(text.slice(last));
   return out;
 }
+
+// ---------- Darkmode ----------
+function currentTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+}
+
+function erColors() {
+  return currentTheme() === 'dark'
+    ? { text: '#e8e8e8', box: '#1f1f1f', border: '#4a4a4a', count: '#6a6a6a',
+        col: '#d0d0d0', colOff: '#555555', edge: '#4a4a4a', edgeDim: '#2a2a2a', edgeActive: '#ff7b72' }
+    : { text: '#161616', box: '#ffffff', border: '#c9c9c9', count: '#bcbcbc',
+        col: '#2a2a2a', colOff: '#c0c0c0', edge: '#d8d8d8', edgeDim: '#efefef', edgeActive: '#b3261e' };
+}
+
+function updateThemeButton() {
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = currentTheme() === 'dark' ? '☀ hell' : '☾ dunkel';
+}
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('mondial-theme', next); } catch (e) {}
+  updateThemeButton();
+  if (db) renderERDiagram(document.getElementById('sql-input').value);
+});
+updateThemeButton();
+
+// ---------- ChatGPT / Claude fragen ----------
+let lastRun = null;
+
+function tablesInQuery(sql) {
+  const found = [];
+  for (const name of ALL_TABLE_NAMES) {
+    const re = new RegExp('(^|[^A-Za-z0-9_])' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^A-Za-z0-9_])', 'i');
+    if (re.test(sql)) found.push(name);
+  }
+  return found;
+}
+
+function previewRows(res, n) {
+  const lines = [res.columns.join(' | ')];
+  res.values.slice(0, n).forEach(r => {
+    lines.push(r.map(v => v === null ? 'NULL' : String(v).slice(0, 40)).join(' | '));
+  });
+  return lines.join('\n');
+}
+
+function buildAskPrompt() {
+  const MAX_SQL = 2500;
+  let sql = document.getElementById('sql-input').value.trim();
+  const run = lastRun && lastRun.sql === sql ? lastRun : null;
+  if (sql.length > MAX_SQL) sql = sql.slice(0, MAX_SQL) + '\n… (gekürzt)';
+
+  const used = tablesInQuery(sql);
+  const schema = used.map(t =>
+    t + '(' + (TABLE_COLUMNS[t] || []).map(c => c.split(' ')[0]).join(', ') + ')'
+  ).join('\n');
+
+  let p = 'Ich lerne SQL und übe mit der MONDIAL-Geodatenbank (Länder, Städte, Flüsse, Berge, Organisationen usw.). '
+        + 'Die Abfragen laufen in SQLite (sql.js im Browser), also gilt der SQLite-Dialekt.\n\n';
+
+  if (!sql) {
+    p += 'Ich habe noch keine Abfrage geschrieben. Gib mir bitte eine kleine Übungsaufgabe mit der MONDIAL-Datenbank '
+       + 'und erkläre kurz, welche Tabellen ich dafür brauche, aber verrate die Lösung noch nicht.\n\n'
+       + 'Verfügbare Tabellen: ' + ALL_TABLE_NAMES.join(', ');
+    return p;
+  }
+
+  p += 'Meine Abfrage:\n' + sql + '\n\n';
+
+  if (run && run.error) {
+    p += 'Fehlermeldung der Datenbank:\n' + run.error + '\n\n';
+  } else if (run && run.results) {
+    if (run.results.length === 0) {
+      p += 'Die Abfrage lief ohne Fehler, hat aber keine Zeilen zurückgegeben.\n\n';
+    } else {
+      const r = run.results[run.results.length - 1];
+      p += 'Die Abfrage lief ohne Fehler und lieferte ' + r.values.length + ' Zeile(n). Die ersten Zeilen:\n'
+         + previewRows(r, 5) + '\n\n';
+    }
+  } else {
+    p += '(Ich habe die Abfrage noch nicht ausgeführt.)\n\n';
+  }
+
+  if (schema) p += 'Relevante Tabellen mit Spalten:\n' + schema + '\n\n';
+  else p += 'Verfügbare Tabellen: ' + ALL_TABLE_NAMES.join(', ') + '\n\n';
+
+  if (run && run.error) {
+    p += 'Erkläre mir bitte auf Deutsch, locker und direkt, WARUM die Abfrage nicht funktioniert. '
+       + 'Erkläre das SQL-Konzept, das hier schiefläuft, statt nur die fertige Lösung hinzuschreiben. '
+       + 'Gib mir dann einen Hinweis, wie ich es selbst beheben kann. Die korrigierte Abfrage zeigst du erst am Ende.';
+  } else if (run && run.results && run.results.length === 0) {
+    p += 'Erkläre mir bitte auf Deutsch, warum hier vermutlich nichts zurückkommt '
+       + '(z. B. falsche Bedingung, Groß-/Kleinschreibung, falsche Spalte im JOIN) und wie ich das prüfen kann.';
+  } else {
+    p += 'Erkläre mir bitte auf Deutsch Schritt für Schritt, was diese Abfrage macht, '
+       + 'ob sie logisch das tut, was man vermutlich will, und was man besser oder einfacher schreiben könnte.';
+  }
+  return p;
+}
+
+function setAskLinks() {
+  const q = encodeURIComponent(buildAskPrompt());
+  document.getElementById('ask-gpt').href = 'https://chatgpt.com/?q=' + q;
+  document.getElementById('ask-claude').href = 'https://claude.ai/new?q=' + q;
+}
+['ask-gpt', 'ask-claude'].forEach(id => {
+  const a = document.getElementById(id);
+  // href kurz vor dem Oeffnen aktualisieren (auch fuer Mittelklick / Rechtsklick)
+  ['mousedown', 'focus', 'touchstart'].forEach(ev => a.addEventListener(ev, setAskLinks));
+  a.addEventListener('click', setAskLinks);
+});
 
 function syncEditor() {
   const ta = document.getElementById('sql-input');
