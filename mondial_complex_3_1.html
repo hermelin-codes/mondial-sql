@@ -233,6 +233,16 @@
   table.result-table tr:hover td{background:var(--note-bg);}
   .truncate-note{margin-top:8px; font-size:11.5px; color:var(--muted); font-family:var(--mono);}
 
+  .suggest{
+    font-family:var(--mono); font-size:13px; color:var(--text); margin:2px 0 8px;
+  }
+  .suggest button{
+    font-family:var(--mono); font-size:13px; font-weight:600; color:var(--hl-kw);
+    background:none; border:none; padding:0; cursor:pointer;
+    text-decoration:underline; text-decoration-color:var(--border-2); text-underline-offset:3px;
+  }
+  .suggest button:hover{text-decoration-color:var(--hl-kw);}
+  .suggest .muted{color:var(--muted);}
   .ask-row{
     display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px;
   }
@@ -541,6 +551,141 @@ function showError(query, message) {
   msg.className = 'error-msg';
   msg.textContent = message;
   errorArea.appendChild(msg);
+  const hint = buildSuggestion(query, message);
+  if (hint) errorArea.appendChild(hint);
+}
+
+// ---------- "Meintest du …?" nach einem Fehler (nur beim Ausführen, nie beim Tippen) ----------
+const SQLITE_FUNCS = ['abs', 'avg', 'cast', 'char', 'coalesce', 'count', 'date', 'datetime', 'group_concat',
+  'hex', 'ifnull', 'iif', 'instr', 'julianday', 'length', 'like', 'lower', 'ltrim', 'max', 'min', 'nullif',
+  'printf', 'random', 'replace', 'round', 'rtrim', 'sign', 'strftime', 'substr', 'substring', 'sum', 'time',
+  'total', 'trim', 'typeof', 'upper', 'row_number', 'rank', 'dense_rank', 'lag', 'lead'];
+// Funktionen aus anderen Dialekten (v. a. Oracle) und ihre SQLite-Entsprechung
+const FUNC_EQUIVALENTS = { nvl: 'IFNULL', len: 'LENGTH' };
+const SQL_SUGGEST_KEYWORDS = ['SELECT', 'FROM', 'WHERE', 'GROUP', 'ORDER', 'BY', 'HAVING', 'LIMIT', 'DISTINCT',
+  'JOIN', 'INNER', 'LEFT', 'OUTER', 'CROSS', 'NATURAL', 'ON', 'USING', 'AS', 'AND', 'OR', 'NOT', 'IN', 'EXISTS',
+  'BETWEEN', 'LIKE', 'IS', 'NULL', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'ASC', 'DESC', 'UNION', 'INTERSECT',
+  'EXCEPT', 'WITH', 'ALL', 'OFFSET'];
+
+function editDistance(a, b) {
+  a = a.toLowerCase(); b = b.toLowerCase();
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      // vertauschte Nachbarbuchstaben zaehlen nur als ein Fehler
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[a.length][b.length];
+}
+
+// Kandidaten nach Aehnlichkeit; bevorzugte Kandidaten gewinnen bei Gleichstand
+function closestNames(word, candidates, preferred) {
+  const limit = Math.max(1, Math.floor(word.length / 3));
+  const seen = new Set();
+  const scored = [];
+  for (const c of candidates) {
+    const key = c.toLowerCase();
+    if (seen.has(key) || key === word.toLowerCase()) continue;
+    seen.add(key);
+    const dist = editDistance(word, c);
+    if (dist <= limit) scored.push({ c, dist, pref: preferred && preferred.has(key) ? 0 : 1 });
+  }
+  scored.sort((x, y) => x.dist - y.dist || x.pref - y.pref || x.c.localeCompare(y.c));
+  return scored.slice(0, 3).map(s => s.c);
+}
+
+function columnName(def) {
+  const i = def.indexOf(' ');
+  return i === -1 ? def : def.slice(0, i);
+}
+
+function buildSuggestion(query, message) {
+  let m, wrong, options = [], kind = '';
+
+  if ((m = message.match(/no such column: (.+)$/i))) {
+    wrong = m[1].trim();
+    const dot = wrong.lastIndexOf('.');
+    const col = dot === -1 ? wrong : wrong.slice(dot + 1);
+    const prefix = dot === -1 ? '' : wrong.slice(0, dot + 1);
+    const usedTables = tablesInQuery(query);
+    const preferred = new Set();
+    usedTables.forEach(t => (TABLE_COLUMNS[t] || []).forEach(c => preferred.add(columnName(c).toLowerCase())));
+    const all = [];
+    Object.values(TABLE_COLUMNS).forEach(cols => cols.forEach(c => all.push(columnName(c))));
+    options = closestNames(col, all, preferred).map(c => prefix + c);
+    kind = 'Spalte';
+    if (!options.length && usedTables.length) {
+      const inTables = usedTables.map(t => t + ': ' + (TABLE_COLUMNS[t] || []).map(columnName).join(', '));
+      return makeHint(null, null, 'Spalten der benutzten Tabellen, ' + inTables.join(' · '));
+    }
+  } else if ((m = message.match(/no such table: (.+)$/i))) {
+    wrong = m[1].trim().replace(/^main\./i, '');
+    options = closestNames(wrong, ALL_TABLE_NAMES);
+    kind = 'Tabelle';
+  } else if ((m = message.match(/no such function: (.+)$/i))) {
+    wrong = m[1].trim();
+    const known = FUNC_EQUIVALENTS[wrong.toLowerCase()];
+    options = known ? [known] : closestNames(wrong, SQLITE_FUNCS).map(f => f.toUpperCase());
+    kind = 'Funktion';
+  } else if (/syntax error/i.test(message)) {
+    // SQLite meldet oft das Wort NACH dem Tippfehler ("SELECT Name FORM Country" -> near "Country"),
+    // weil es "FORM" fuer einen Alias haelt. Daher alle Woerter der Abfrage gegen Schluesselwoerter pruefen.
+    const known = new Set(ALL_TABLE_NAMES.map(t => t.toLowerCase()));
+    Object.values(TABLE_COLUMNS).forEach(cols => cols.forEach(c => known.add(columnName(c).toLowerCase())));
+    SQLITE_FUNCS.forEach(f => known.add(f));
+    const words = query.replace(/'(?:[^']|'')*'?|"(?:[^"]|"")*"?|--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/g, ' ')
+                       .match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
+    for (const w of words) {
+      if (w.length < 4 || known.has(w.toLowerCase()) || SQL_SUGGEST_KEYWORDS.includes(w.toUpperCase())) continue;
+      const hit = closestNames(w, SQL_SUGGEST_KEYWORDS);
+      if (hit.length && editDistance(w, hit[0]) <= (w.length >= 6 ? 2 : 1)) {
+        wrong = w; options = [hit[0]]; kind = 'Schlüsselwort';
+        break;
+      }
+    }
+  }
+  if (!options.length) return null;
+  return makeHint(wrong, options, null, kind);
+}
+
+function makeHint(wrong, options, plainText, kind) {
+  const div = document.createElement('div');
+  div.className = 'suggest';
+  if (plainText) {
+    div.innerHTML = '<span class="muted">' + escapeHtml(plainText) + '</span>';
+    return div;
+  }
+  div.appendChild(document.createTextNode('Meintest du '));
+  options.forEach((opt, i) => {
+    if (i > 0) div.appendChild(document.createTextNode(i === options.length - 1 ? ' oder ' : ', '));
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = opt;
+    b.title = '„' + wrong + '" durch „' + opt + '" ersetzen';
+    b.onclick = () => replaceInEditor(wrong, opt);
+    div.appendChild(b);
+  });
+  div.appendChild(document.createTextNode('?'));
+  const note = document.createElement('span');
+  note.className = 'muted';
+  note.textContent = '  (' + kind + ' antippen zum Ersetzen)';
+  div.appendChild(note);
+  return div;
+}
+
+function replaceInEditor(wrong, right) {
+  const ta = document.getElementById('sql-input');
+  const esc = wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('(^|[^A-Za-z0-9_])' + esc + '(?![A-Za-z0-9_])', 'gi');
+  ta.value = ta.value.replace(re, (all, pre) => pre + right);
+  syncEditor();
+  updateViz(ta.value);
+  ta.focus();
 }
 
 // ---------- Visualisierung: Tabellenbeziehungen & Abfrage-Ablauf ----------
