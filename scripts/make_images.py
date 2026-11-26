@@ -24,7 +24,26 @@ try:
         shot = public / 'og-full.png'
         pg.screenshot(path=str(shot))
         from PIL import Image
-        Image.open(shot).resize((1200, 630), Image.LANCZOS).save(public / 'og.png', optimize=True)
+        # Vorschaukarte: Überschrift links, Screenshot der Seite rechts angeschnitten (wirkt auch klein lesbar)
+        import base64
+        b64 = base64.b64encode(shot.read_bytes()).decode()
+        card = b.new_page(viewport={'width': 1200, 'height': 630}, device_scale_factor=1)
+        card.set_content(f'''<style>
+          *{{box-sizing:border-box;margin:0}}
+          body{{width:1200px;height:630px;background:#f6f6f4;font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Helvetica,Arial,sans-serif;color:#141414;position:relative;overflow:hidden}}
+          .logo{{position:absolute;left:72px;top:64px;font:500 26px ui-monospace,Menlo,Consolas,monospace;color:#777}}
+          h1{{position:absolute;left:72px;top:150px;width:520px;font-size:56px;line-height:1.1;font-weight:700;letter-spacing:-1.2px}}
+          p{{position:absolute;left:72px;top:356px;width:440px;font-size:26px;line-height:1.4;color:#666}}
+          .url{{position:absolute;left:72px;bottom:56px;font:500 24px ui-monospace,Menlo,Consolas,monospace;color:#141414}}
+          .shot{{position:absolute;left:640px;top:96px;width:760px;border-radius:16px;border:1px solid #d8d8d4;box-shadow:0 24px 60px rgba(0,0,0,.16)}}
+        </style>
+        <div class="logo">mondial · sql</div>
+        <h1>SQL üben mit<br>der Mondial&#8209;<br>Datenbank</h1>
+        <p>Direkt im Browser, ohne Installation. Mit ER&#8209;Diagramm und Aufgaben.</p>
+        <div class="url">mondial-sql.pages.dev</div>
+        <img class="shot" src="data:image/png;base64,{b64}">''')
+        card.wait_for_timeout(300)
+        card.screenshot(path=str(public / 'og.png'))
         shot.unlink()
         # Icons aus dem SVG
         svg = (public / 'favicon.svg').read_text()

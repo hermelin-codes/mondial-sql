@@ -146,8 +146,9 @@ function head({ title, description, path: p, jsonld }) {
 <meta property="og:image" content="${SITE_URL}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="SQL-Editor mit Ergebnistabelle und ER-Diagramm der Mondial-Datenbank">
+<meta property="og:image:alt" content="Vorschau: SQL üben mit der Mondial-Datenbank, Editor mit Ergebnistabelle und ER-Diagramm">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${SITE_URL}/og.png">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
