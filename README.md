@@ -2,7 +2,7 @@
 
 **SQL üben mit der MONDIAL-Datenbank, direkt im Browser.**
 
-👉 **Ausprobieren: [mondial-sql.pages.dev](https://mondial-sql.pages.dev)**
+👉 **Ausprobieren: [mondial-sql.pages.dev](https://mondial-sql.pages.dev)** · English: [mondial-sql.pages.dev/en/](https://mondial-sql.pages.dev/en/)
 
 ![SQL-Editor mit Ergebnistabelle und ER-Diagramm](web/public/og.png)
 
@@ -19,6 +19,7 @@ Viele Datenbank-Vorlesungen üben SQL mit MONDIAL, einer Geodatenbank mit Lände
 - **[Übungsaufgaben](https://mondial-sql.pages.dev/aufgaben/)** mit Hinweisen und geprüften Lösungen, vom SELECT bis zur korrelierten Unterabfrage.
 - **[Schema-Übersicht](https://mondial-sql.pages.dev/schema/)** mit allen Tabellen, Spalten, Schlüsseln und Verknüpfungen.
 - Hell und dunkel umschaltbar.
+- **Deutsch und Englisch.** Deutsch ist Standard. Wer im Browser kein Deutsch eingestellt hat, landet automatisch auf der englischen Fassung unter `/en/`. Die Wahl über den Umschalter oben wird gemerkt.
 
 Die Abfragen laufen in **SQLite**. Falls deine Vorlesung Oracle nutzt: Dort heißt es `MINUS` statt `EXCEPT`, `NVL` statt `IFNULL` und `FETCH FIRST n ROWS ONLY` statt `LIMIT`.
 
@@ -30,14 +31,16 @@ Alle Abfragen werden nur in deinem Browser ausgeführt. Die Seite setzt keine Co
 
 ```
 src/app.js           Editor, Ausführen, Diagramm, Vorschläge, Verlauf
+src/i18n.js          Texte der App auf Deutsch und Englisch
 src/er-data.js       Anordnung und Beziehungen der Tabellen im ER-Diagramm
-src/theme.js         Hell/dunkel-Umschalter (alle Seiten)
+src/theme.js         Hell/dunkel- und Sprachumschalter (alle Seiten)
 src/formatter.js     Einstieg für sql-formatter (wird gebündelt)
 web/index.html       Vorlage der Startseite
 web/style.css        Styles für alle Seiten
-web/site.mjs         Texte, FAQ und Tabellenbeschreibungen
-web/aufgaben.mjs     Übungsaufgaben
-web/public/          Favicon und Vorschaubild
+web/site.mjs         Startseitentexte, FAQ und Tabellenbeschreibungen (de/en)
+web/ui.mjs           feste Seitentexte und Pfade je Sprache
+web/aufgaben.mjs     Übungsaufgaben (de/en)
+web/public/          Favicon und Vorschaubilder (og.png, og-en.png)
 data/mondial.sqlite  die Datenbank (SQLite)
 data/schema.sql      Tabellendefinitionen für Diagramm und Schema-Seite
 build.mjs            baut alles nach dist/

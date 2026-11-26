@@ -84,3 +84,9 @@ const ER_EDGES = [
   ['islandIn', 'Lake', 'islandIn.Lake = Lake.Name'],
   ['islandIn', 'River', 'islandIn.River = River.Name'],
 ];
+
+// Englische Fassung der Klammerzusätze in ER_EDGES
+const ER_NOTES_EN = { 'mündet in Fluss': 'flows into river', 'mündet in See': 'flows into lake', 'mündet ins Meer': 'flows into sea', 'Abfluss': 'outflow' };
+function edgeVia(via, lang) {
+  return lang === 'en' ? via.replace(/\(([^()]*)\)$/, (m, n) => '(' + (ER_NOTES_EN[n] || n) + ')') : via;
+}

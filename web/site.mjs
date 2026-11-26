@@ -6,7 +6,7 @@ export const SITE = {
   // Basis-URL für Canonical-Links, Sitemap und Vorschaubilder. Beim Build über SITE_URL überschreibbar.
   url: 'https://mondial-sql.pages.dev',
   repo: 'https://github.com/hermelin-codes/mondial-sql',
-  lang: 'de',
+  lang: 'de',   // Standardsprache, Englisch liegt unter /en/
 };
 
 export const MONDIAL = {
@@ -14,16 +14,30 @@ export const MONDIAL = {
   license: 'https://creativecommons.org/licenses/by/3.0/deed.de',
   copy: 'https://github.com/ullenboom/mondial-database',
 };
+// Lizenztext je Sprache
+export const LICENSE_URL = {
+  de: 'https://creativecommons.org/licenses/by/3.0/deed.de',
+  en: 'https://creativecommons.org/licenses/by/3.0/deed.en',
+};
 
 export const HOME = {
+  de: {
   title: 'SQL üben mit der Mondial-Datenbank – online im Browser',
   description: 'SQL online üben mit der MONDIAL-Geodatenbank: Abfragen direkt im Browser ausführen, Tabellen im ER-Diagramm sehen, Fehler erklärt bekommen. Kostenlos, ohne Installation.',
   h1: 'SQL üben mit der Mondial-Datenbank',
   sub: 'Direkt im Browser, ohne Installation. Deine Abfragen laufen lokal in SQLite.',
+  },
+  en: {
+    title: 'Practice SQL with the Mondial Database – online in your browser',
+    description: 'Practice SQL online with the MONDIAL geography database: run queries right in your browser, see the tables in an ER diagram and get errors explained. Free, no installation.',
+    h1: 'Practice SQL with the Mondial Database',
+    sub: 'Right in your browser, no installation. Your queries run locally in SQLite.',
+  },
 };
 
-// FAQ auf der Startseite (sichtbar im Fuß und als FAQPage-JSON-LD). Antworten als Klartext.
-export const FAQ = [
+// FAQ auf der Startseite, je Sprache (sichtbar im Fuß und als FAQPage-JSON-LD). Antworten als Klartext.
+export const FAQ = {
+  de: [
   {
     q: 'Was ist die Mondial-Datenbank?',
     a: 'MONDIAL ist eine geografische Beispieldatenbank von Wolfgang May (Universität Göttingen) mit Ländern, Städten, Provinzen, Flüssen, Seen, Bergen, Wüsten, Inseln, Sprachen, Religionen und internationalen Organisationen. Sie wird an vielen Hochschulen in Datenbank-Vorlesungen zum Üben von SQL verwendet.',
@@ -48,10 +62,38 @@ export const FAQ = [
     q: 'Gibt es Übungsaufgaben mit Lösungen?',
     a: 'Ja, unter Aufgaben findest du Übungen vom Einstieg bis zu korrelierten Unterabfragen, jeweils mit Hinweis, Lösung und Link direkt in den Trainer.',
   },
-];
+  ],
+  en: [
+  {
+    q: 'What is the Mondial database?',
+    a: 'MONDIAL is a sample geography database by Wolfgang May (University of Göttingen) with countries, cities, provinces, rivers, lakes, mountains, deserts, islands, languages, religions and international organizations. Many universities use it in database courses to practice SQL.',
+  },
+  {
+    q: 'Do I need to install anything or create an account?',
+    a: 'No. The whole database is loaded into your browser when you open the page (about 3 MB). After that, all queries run locally.',
+  },
+  {
+    q: 'Which SQL dialect is used?',
+    a: 'SQLite. Most queries from lectures work unchanged. If your course uses Oracle, there are a few differences: EXCEPT instead of MINUS, IFNULL instead of NVL and LIMIT instead of FETCH FIRST or ROWNUM.',
+  },
+  {
+    q: 'Are my queries stored or uploaded?',
+    a: 'No. Queries run only in your browser and the history stays on your device. Only when you click “Ask ChatGPT” or “Ask Claude” is your query, including the error message, passed to the service you chose.',
+  },
+  {
+    q: 'What does the diagram next to the editor show?',
+    a: 'All tables and how they are linked. Tables used by your query are highlighted. Zoom with the mouse wheel or two fingers and drag to move the diagram. The “Order” tab shows the order in which the parts of a query are evaluated.',
+  },
+  {
+    q: 'Are there exercises with solutions?',
+    a: 'Yes, under Exercises you will find tasks from the basics up to correlated subqueries, each with a hint, a solution and a link straight into the trainer.',
+  },
+  ],
+};
 
-// Kurzbeschreibungen für die Schema-Seite.
+// Kurzbeschreibungen für die Schema-Seite, je Sprache.
 export const TABLE_INFO = {
+  de: {
   Country: 'Alle Länder mit Ländercode, Hauptstadt, Fläche (km²) und Einwohnerzahl. Der Code (zum Beispiel D für Deutschland) ist der Schlüssel, auf den fast alle anderen Tabellen verweisen.',
   City: 'Städte mit Land, Provinz, Einwohnerzahl und Koordinaten. Eindeutig ist eine Stadt erst über Name, Land und Provinz zusammen.',
   Province: 'Verwaltungseinheiten (Bundesländer, Regionen, Bundesstaaten) mit Einwohnern, Fläche und Hauptstadt.',
@@ -100,14 +142,65 @@ export const TABLE_INFO = {
   geo_Island: 'Zu welchen Ländern und Provinzen eine Insel gehört.',
   zone: 'Klimazonen mit Temperatur- und Niederschlagsbereich (nur wenige Beispielzeilen).',
   countryInZone: 'Ordnet Länder Klimazonen zu (nur wenige Beispielzeilen).',
+  },
+  en: {
+  Country: 'All countries with country code, capital, area (km²) and population. The code (for example D for Germany) is the key that almost every other table refers to.',
+  City: 'Cities with country, province, population and coordinates. A city is only unique by name, country and province together.',
+  Province: 'Administrative divisions (German states, regions, US states) with population, area and capital.',
+  Continent: 'The five continents with their area.',
+  encompasses: 'Assigns countries to continents. Percentage is the share of the area on that continent, which is why countries like Russia or Turkey appear twice.',
+  borders: 'Shared borders of two countries with their length in km. Each border appears only once, so a country can be in Country1 or Country2.',
+  Economy: 'Economic data per country: GDP, shares of agriculture, industry and services, inflation and unemployment.',
+  Politics: 'Independence date, former dependency and form of government per country.',
+  Population: 'Population growth and infant mortality per country.',
+  Countrypops: 'Population of countries in different years.',
+  Citypops: 'Population of cities in different years.',
+  Provpops: 'Population of provinces in different years.',
+  Countrylocalname: 'Name of a country in its local language.',
+  Countryothername: 'Other names of a country.',
+  Citylocalname: 'Name of a city in its local language, often in its own script.',
+  Cityothername: 'Other names and spellings of a city.',
+  Provincelocalname: 'Name of a province in its local language.',
+  Provinceothername: 'Other names of a province.',
+  Language: 'Languages spoken per country with their share of the population.',
+  Religion: 'Religions per country with their share of the population.',
+  EthnicGroup: 'Ethnic groups per country with their share of the population.',
+  Organization: 'International organizations with abbreviation, headquarters and founding date.',
+  isMember: 'Memberships of countries in organizations. Type distinguishes, for example, member, observer and candidate.',
+  Airport: 'Airports with IATA code, city, coordinates, elevation and time zone.',
+  River: 'Rivers with length, source and mouth. River, Lake and Sea say where the river flows into.',
+  Lake: 'Lakes with area, depth and elevation. River is the outflow.',
+  Sea: 'Seas and oceans with area and maximum depth.',
+  Mountain: 'Mountains with elevation, mountain range and type (for example volcano).',
+  Desert: 'Deserts with area and coordinates.',
+  Island: 'Islands with area, elevation and island group.',
+  mergesWith: 'Which seas border each other.',
+  RiverThrough: 'Rivers that flow through a lake.',
+  islandIn: 'Which sea, lake or river an island lies in.',
+  located: 'Cities located on a river, lake or sea.',
+  locatedOn: 'Cities located on an island.',
+  LakeOnIsland: 'Lakes on islands.',
+  RiverOnIsland: 'Rivers on islands.',
+  MountainOnIsland: 'Mountains on islands.',
+  geo_River: 'Which countries and provinces a river flows through.',
+  geo_Source: 'In which country and province a river rises.',
+  geo_Estuary: 'In which country and province a river ends.',
+  geo_Lake: 'Which countries and provinces a lake lies in.',
+  geo_Sea: 'Which countries and provinces border a sea.',
+  geo_Mountain: 'Which countries and provinces a mountain lies in.',
+  geo_Desert: 'Which countries and provinces a desert lies in.',
+  geo_Island: 'Which countries and provinces an island belongs to.',
+  zone: 'Climate zones with temperature and precipitation ranges (only a few sample rows).',
+  countryInZone: 'Assigns countries to climate zones (only a few sample rows).',
+  },
 };
 
 // Reihenfolge der Gruppen auf der Schema-Seite
 export const TABLE_GROUPS = [
-  { title: 'Länder und Kontinente', tables: ['Country', 'Continent', 'encompasses', 'borders', 'Economy', 'Politics', 'Population', 'Countrypops', 'Countrylocalname', 'Countryothername'] },
-  { title: 'Provinzen und Städte', tables: ['Province', 'Provpops', 'Provincelocalname', 'Provinceothername', 'City', 'Citypops', 'Citylocalname', 'Cityothername', 'Airport'] },
-  { title: 'Bevölkerung und Organisationen', tables: ['Language', 'Religion', 'EthnicGroup', 'Organization', 'isMember'] },
-  { title: 'Geografie', tables: ['River', 'Lake', 'Sea', 'Mountain', 'Desert', 'Island', 'mergesWith', 'RiverThrough', 'islandIn', 'located', 'locatedOn', 'LakeOnIsland', 'RiverOnIsland', 'MountainOnIsland'] },
-  { title: 'Wo liegt was (geo_-Tabellen)', tables: ['geo_River', 'geo_Source', 'geo_Estuary', 'geo_Lake', 'geo_Sea', 'geo_Mountain', 'geo_Desert', 'geo_Island'] },
-  { title: 'Klimazonen', tables: ['zone', 'countryInZone'] },
+  { title: { de: 'Länder und Kontinente', en: 'Countries and continents' }, tables: ['Country', 'Continent', 'encompasses', 'borders', 'Economy', 'Politics', 'Population', 'Countrypops', 'Countrylocalname', 'Countryothername'] },
+  { title: { de: 'Provinzen und Städte', en: 'Provinces and cities' }, tables: ['Province', 'Provpops', 'Provincelocalname', 'Provinceothername', 'City', 'Citypops', 'Citylocalname', 'Cityothername', 'Airport'] },
+  { title: { de: 'Bevölkerung und Organisationen', en: 'Population and organizations' }, tables: ['Language', 'Religion', 'EthnicGroup', 'Organization', 'isMember'] },
+  { title: { de: 'Geografie', en: 'Geography' }, tables: ['River', 'Lake', 'Sea', 'Mountain', 'Desert', 'Island', 'mergesWith', 'RiverThrough', 'islandIn', 'located', 'locatedOn', 'LakeOnIsland', 'RiverOnIsland', 'MountainOnIsland'] },
+  { title: { de: 'Wo liegt was (geo_-Tabellen)', en: 'What is where (geo_ tables)' }, tables: ['geo_River', 'geo_Source', 'geo_Estuary', 'geo_Lake', 'geo_Sea', 'geo_Mountain', 'geo_Desert', 'geo_Island'] },
+  { title: { de: 'Klimazonen', en: 'Climate zones' }, tables: ['zone', 'countryInZone'] },
 ];

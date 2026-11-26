@@ -3,7 +3,8 @@
 //   SITE_URL=https://example.de node build.mjs
 //
 // Ablauf: Assets kopieren und bündeln, Aufgabenlösungen gegen die Datenbank prüfen,
-// Startseite, Schema- und Aufgabenseite, 404, sitemap.xml, robots.txt und _headers schreiben.
+// Startseite, Schema- und Aufgabenseite und 404 je Sprache (Deutsch unter /, Englisch unter /en/),
+// dazu sitemap.xml, robots.txt und _headers schreiben.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,7 +12,8 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import * as esbuild from 'esbuild';
 import initSqlJs from 'sql.js';
-import { SITE, MONDIAL, HOME, FAQ, TABLE_INFO, TABLE_GROUPS } from './web/site.mjs';
+import { SITE, MONDIAL, LICENSE_URL, HOME, FAQ, TABLE_INFO, TABLE_GROUPS } from './web/site.mjs';
+import { LANGS, PATHS, UI } from './web/ui.mjs';
 import { LEVELS } from './web/aufgaben.mjs';
 
 const require = createRequire(import.meta.url);
@@ -67,6 +69,7 @@ const assetUrls = {
 const appSource = [
   `const SCHEMA_TEXT = ${JSON.stringify(schemaText)};`,
   `const ASSET_URLS = ${JSON.stringify(assetUrls)};`,
+  read('src/i18n.js'),
   read('src/er-data.js'),
   read('src/app.js'),
 ].join('\n');
@@ -79,14 +82,20 @@ const db = new SQL.Database(dbBytes);
 const rowCount = (t) => db.exec(`SELECT COUNT(*) FROM "${t}"`)[0].values[0][0];
 
 const problems = [];
+const checkSolution = (id, sql) => {
+  try {
+    const res = db.exec(sql);
+    if (!res.length || !res[res.length - 1].values.length) problems.push(`${id}: Lösung liefert keine Zeilen`);
+  } catch (e) {
+    problems.push(`${id}: ${e.message}`);
+  }
+};
 for (const level of LEVELS) {
+  if (!level.en) problems.push(`Stufe ${level.title}: englische Fassung fehlt`);
   for (const t of level.tasks) {
-    try {
-      const res = db.exec(t.solution);
-      if (!res.length || !res[res.length - 1].values.length) problems.push(`${t.id}: Lösung liefert keine Zeilen`);
-    } catch (e) {
-      problems.push(`${t.id}: ${e.message}`);
-    }
+    checkSolution(t.id, t.solution);
+    if (!t.en || !t.en.id) problems.push(`${t.id}: englische Fassung fehlt`);
+    else if (t.en.solution) checkSolution(`${t.id} (en)`, t.en.solution);
   }
 }
 if (problems.length) {
@@ -120,35 +129,61 @@ for (const m of schemaText.matchAll(/CREATE TABLE\s+(\w+)\s*\(([\s\S]*?)\);/gi))
   }
   TABLES[name] = { name, columns, pk, rows: rowCount(name) };
 }
-const ER = new Function(read('src/er-data.js') + '\nreturn { ER_EDGES };')();
+const ER = new Function(read('src/er-data.js') + '\nreturn { ER_EDGES, edgeVia };')();
 const grouped = new Set(TABLE_GROUPS.flatMap(g => g.tables));
 const missing = Object.keys(TABLES).filter(t => !grouped.has(t));
 if (missing.length) { console.error('Tabellen ohne Gruppe in web/site.mjs: ' + missing.join(', ')); process.exit(1); }
+for (const L of LANGS) {
+  const noInfo = Object.keys(TABLES).filter(t => !TABLE_INFO[L][t]);
+  if (noInfo.length) { console.error(`Tabellen ohne Beschreibung (${L}) in web/site.mjs: ` + noInfo.join(', ')); process.exit(1); }
+}
 
 // ------------------------------------------------------------------ Bausteine
-const trainerLink = (sql) => '/#q=' + encodeURIComponent(sql);
+const other = (L) => (L === 'de' ? 'en' : 'de');
+const pageUrl = (p) => `${SITE_URL}/${p}`;
+const trainerLink = (L, sql) => '/' + PATHS.home[L] + '#q=' + encodeURIComponent(sql);
+const pick = (L, obj) => ({ ...obj, ...(L === 'en' ? obj.en : {}) });   // Aufgabe/Stufe in Sprache L
 
-function head({ title, description, path: p, jsonld }) {
-  const url = `${SITE_URL}/${p}`;
+// Automatische Sprachwahl, läuft vor allem anderen im <head>:
+// Deutsch ist Standard. Auf deutschen Seiten geht es nach Englisch, wenn der Browser kein Deutsch
+// bevorzugt (oder Englisch gewählt wurde). Auf englischen Seiten nur zurück, wenn jemand Deutsch gewählt hat.
+// Crawler werden nie umgeleitet, damit beide Sprachfassungen indexiert werden.
+function langRedirect(L, target, keepHash) {
+  const cond = L === 'de'
+    ? "var w=s;if(w!=='de'&&w!=='en'){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||''];w='en';for(var i=0;i<l.length;i++){var c=String(l[i]).slice(0,2).toLowerCase();if(c==='de'){w='de';break}if(c==='en')break}}if(w!=='en')return;"
+    : "if(s!=='de')return;";
+  return `<script>(function(){var s=null;try{s=localStorage.getItem('mondial-lang')}catch(e){}if(/bot|crawl|spider|slurp|preview|lighthouse|headless/i.test(navigator.userAgent||''))return;${cond}location.replace('/${target}'+location.search${keepHash ? '+location.hash' : ''})})();</script>`;
+}
+
+// alt: Seitenschlüssel aus PATHS (home, tasks, schema) für hreflang und Umschalter, oder null (404)
+function head(L, { title, description, alt, path: p, jsonld, keepHash = false }) {
+  const url = pageUrl(p);
+  const ui = UI[L];
   const ld = jsonld ? `\n<script type="application/ld+json">${JSON.stringify(jsonld).replace(/</g, '\\u003c')}</script>` : '';
+  const ogImage = `${SITE_URL}/${L === 'de' ? 'og.png' : 'og-en.png'}`;
+  const alternates = alt ? `
+<link rel="alternate" hreflang="de" href="${pageUrl(PATHS[alt].de)}">
+<link rel="alternate" hreflang="en" href="${pageUrl(PATHS[alt].en)}">
+<link rel="alternate" hreflang="x-default" href="${pageUrl(PATHS[alt].de)}">` : '';
   return `<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">${alt ? '\n' + langRedirect(L, PATHS[alt][other(L)], keepHash) : ''}
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
 <meta name="google-site-verification" content="r7uLQ8P6uCxjhFmRTjHVPOYxPbBk2Y86NVCqoM9Z-tU">
-<link rel="canonical" href="${url}">
+<link rel="canonical" href="${url}">${alternates}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${esc(SITE.name)}">
-<meta property="og:locale" content="de_DE">
+<meta property="og:locale" content="${ui.locale}">
+<meta property="og:locale:alternate" content="${UI[other(L)].locale}">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${url}">
-<meta property="og:image" content="${SITE_URL}/og.png">
+<meta property="og:image" content="${ogImage}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Vorschau: SQL üben mit der Mondial-Datenbank, Editor mit Ergebnistabelle und ER-Diagramm">
+<meta property="og:image:alt" content="${esc(ui.ogAlt)}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="${SITE_URL}/og.png">
+<meta name="twitter:image" content="${ogImage}">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -158,60 +193,62 @@ function head({ title, description, path: p, jsonld }) {
 <link rel="stylesheet" href="${asset('assets/style.css')}">${ld}`;
 }
 
-function topbar(current, { tables = false } = {}) {
-  const link = (href, label, id) =>
-    `<a class="nav-link" href="${href}"${current === id ? ' aria-current="page"' : ''}>${label}</a>`;
-  return `  <nav class="topbar" aria-label="Hauptnavigation">
-    <a class="brand" href="/">${esc(SITE.logo)}</a>
+function topbar(L, current, { tables = false, alt = null } = {}) {
+  const ui = UI[L];
+  const link = (key, label) =>
+    `<a class="nav-link" href="/${PATHS[key][L]}"${current === key ? ' aria-current="page"' : ''}>${label}</a>`;
+  const o = other(L);
+  const langHref = '/' + PATHS[alt || 'home'][o];
+  return `  <nav class="topbar" aria-label="${ui.navAria}">
+    <a class="brand" href="/${PATHS.home[L]}">${esc(SITE.logo)}</a>
     <div class="topbar-right">
-      ${link('/aufgaben/', 'Aufgaben', 'aufgaben')}
-      ${link('/schema/', 'Schema', 'schema')}
+      ${link('tasks', ui.navTasks)}
+      ${link('schema', ui.navSchema)}
+      <a class="nav-link" href="${langHref}" hreflang="${o}" lang="${o}" data-lang="${o}" title="${ui.langTitle}">${ui.langLink}</a>
       <button type="button" class="theme-toggle" id="theme-toggle"></button>${tables ? `
       <details class="tables-toggle">
-        <summary>Tabellen</summary>
+        <summary>${ui.navTables}</summary>
         <div id="table-list" class="table-list"></div>
       </details>` : ''}
     </div>
   </nav>`;
 }
 
-function footer({ faq = false } = {}) {
+function footer(L, { faq = false } = {}) {
+  const f = UI[L].foot;
   const faqHtml = faq ? `
     <details>
-      <summary>Häufige Fragen</summary>
-${FAQ.map(f => `      <h3>${esc(f.q)}</h3>\n      <p>${esc(f.a)}</p>`).join('\n')}
+      <summary>${f.faq}</summary>
+${FAQ[L].map(x => `      <h3>${esc(x.q)}</h3>\n      <p>${esc(x.a)}</p>`).join('\n')}
     </details>` : '';
   return `  <footer class="site-foot">${faqHtml}
     <details>
-      <summary>Über die Daten</summary>
-      <p>Die Daten stammen aus der <a href="${MONDIAL.homepage}" target="_blank" rel="noopener">MONDIAL-Datenbank</a> von Wolfgang May (Institut für Informatik, Universität Göttingen) und stehen unter der Lizenz <a href="${MONDIAL.license}" target="_blank" rel="noopener">CC BY 3.0</a>. Diese Seite nutzt eine SQLite-Fassung der Daten, Grundlage ist <a href="${MONDIAL.copy}" target="_blank" rel="noopener">github.com/ullenboom/mondial-database</a>.</p>
-      <p>Zitiervorschlag des Autors: Wolfgang May, <i>Information Extraction and Integration with Florid: The Mondial Case Study</i>, Technical Report 131, Universität Freiburg, 1999.</p>
-      <p>Die Zahlen stammen aus verschiedenen Jahren und Quellen (unter anderem CIA World Factbook). Sie eignen sich zum Üben von SQL, nicht als aktuelle Statistik.</p>
+      <summary>${f.about}</summary>
+      ${f.aboutHtml(MONDIAL, LICENSE_URL[L])}
     </details>
     <details>
-      <summary>Datenschutz</summary>
-      <p>Die Seite setzt keine Cookies und lädt nichts von fremden Servern. Deine Abfragen werden nur in deinem Browser ausgeführt. Der Verlauf und die Einstellung hell/dunkel liegen im lokalen Speicher deines Browsers und verlassen dein Gerät nicht.</p>
-      <p>Klickst du auf „ChatGPT fragen“ oder „Claude fragen“, öffnet sich die Seite des jeweiligen Anbieters mit deiner Abfrage. Ab da gelten dessen Datenschutzbestimmungen. Die Seite selbst wird über Cloudflare Pages ausgeliefert.</p>
+      <summary>${f.privacy}</summary>
+      ${f.privacyHtml}
     </details>
-    <span class="fine">Kostenlos und Open Source · <a href="${SITE.repo}" target="_blank" rel="noopener">GitHub</a> · Daten: MONDIAL von Wolfgang May, <a href="${MONDIAL.license}" target="_blank" rel="noopener">CC BY 3.0</a> · Unabhängiges Projekt, nicht verbunden mit der Universität Göttingen</span>
+    <span class="fine">${f.fineHtml(SITE, LICENSE_URL[L])}</span>
   </footer>`;
 }
 
-function page({ title, description, path: p, jsonld, current, body }) {
+function page(L, { title, description, path: p, alt, jsonld, current, body, keepHash }) {
   return `<!DOCTYPE html>
-<html lang="${SITE.lang}">
+<html lang="${L}">
 <head>
-${head({ title, description, path: p, jsonld })}
+${head(L, { title, description, alt, path: p, jsonld, keepHash })}
 </head>
 <body>
 <main class="page">
-${topbar(current)}
+${topbar(L, current, { alt })}
 
   <article class="doc">
 ${body}
   </article>
 
-${footer()}
+${footer(L)}
 </main>
 <script src="${asset('assets/theme.js')}"></script>
 </body>
@@ -219,140 +256,147 @@ ${footer()}
 `;
 }
 
-// ------------------------------------------------------------------ Startseite
-const homeLd = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'WebApplication',
-      name: SITE.name,
-      url: `${SITE_URL}/`,
-      description: HOME.description,
-      inLanguage: 'de',
-      applicationCategory: 'EducationalApplication',
-      operatingSystem: 'Browser',
-      isAccessibleForFree: true,
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
-      learningResourceType: 'Übungsumgebung',
-      teaches: 'SQL',
-      about: { '@type': 'Dataset', name: 'MONDIAL', creator: { '@type': 'Person', name: 'Wolfgang May' }, license: MONDIAL.license, url: MONDIAL.homepage },
-    },
-    {
-      '@type': 'FAQPage',
-      mainEntity: FAQ.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
-    },
-  ],
-};
-let home = read('web/index.html')
-  .replace('<!--HEAD-->', head({ title: `${HOME.title} | ${SITE.name}`, description: HOME.description, path: '', jsonld: homeLd }))
-  .replace('<!--TOPBAR-->', topbar('home', { tables: true }))
-  .replace('{{h1}}', esc(HOME.h1))
-  .replace('{{sub}}', esc(HOME.sub))
-  .replace('<!--FOOT-->', footer({ faq: true }))
-  .replace('<!--SCRIPTS-->', [
-    `<script src="${asset('assets/theme.js')}"></script>`,
-    `<script src="${asset('assets/sql-formatter.js')}"></script>`,
-    `<script src="${asset('vendor/sql-wasm.js')}"></script>`,
-    `<script src="${asset('assets/app.js')}"></script>`,
-  ].join('\n'));
-if (/\{\{|<!--[A-Z]+-->/.test(home)) throw new Error('Platzhalter in index.html nicht ersetzt');
-emit('index.html', home);
-
-// ------------------------------------------------------------------ Schema-Seite
+const datasetLd = { '@type': 'Dataset', name: 'MONDIAL', creator: { '@type': 'Person', name: 'Wolfgang May' }, license: MONDIAL.license, url: MONDIAL.homepage };
 const tableCount = Object.keys(TABLES).length;
-const anchor = (t) => t.toLowerCase();
-const schemaBody = [];
-schemaBody.push(`    <h1>Mondial-Datenbank: Schema und Tabellen</h1>
-    <p class="lead">Alle ${tableCount} Tabellen der MONDIAL-Datenbank mit Spalten, Primärschlüsseln und Verknüpfungen. Über „Im Trainer öffnen“ schaust du dir jede Tabelle direkt im SQL-Trainer an.</p>
-    <nav class="toc" aria-label="Gruppen">${TABLE_GROUPS.map((g, i) => `<a href="#gruppe-${i + 1}">${esc(g.title)}</a>`).join('')}</nav>`);
-TABLE_GROUPS.forEach((g, gi) => {
-  schemaBody.push(`\n    <h2 id="gruppe-${gi + 1}">${esc(g.title)}</h2>`);
-  for (const name of g.tables) {
-    const t = TABLES[name];
-    const out = ER.ER_EDGES.filter(e => e[0] === name);
-    const inc = [...new Set(ER.ER_EDGES.filter(e => e[1] === name && e[0] !== name).map(e => e[0]))];
-    const rel = [
-      ...out.map(e => `<li>→ <a href="#${anchor(e[1])}">${esc(e[1])}</a>: ${esc(e[2])}</li>`),
-      inc.length ? `<li>← wird referenziert von ${inc.map(n => `<a href="#${anchor(n)}">${esc(n)}</a>`).join(', ')}</li>` : '',
-    ].filter(Boolean).join('');
-    schemaBody.push(`    <section class="card" id="${anchor(name)}">
-      <h3>${esc(name)}</h3>
-      <p class="meta">${t.rows.toLocaleString('de-DE')} Zeilen${t.pk.length ? ` · Primärschlüssel: ${esc(t.pk.join(', '))}` : ''}</p>
-      <p>${esc(TABLE_INFO[name] || '')}</p>
-      <table class="cols">
-        <thead><tr><th>Spalte</th><th>Typ</th></tr></thead>
-        <tbody>${t.columns.map(c => `<tr><td>${esc(c.name)}${t.pk.includes(c.name) ? ' <span class="key" title="Teil des Primärschlüssels">PK</span>' : ''}</td><td class="type">${esc(c.type)}</td></tr>`).join('')}</tbody>
-      </table>${rel ? `\n      <ul class="rel">${rel}</ul>` : ''}
-      <div class="actions"><a href="${trainerLink(`SELECT *\nFROM ${name}\nLIMIT 20;`)}">Im Trainer öffnen →</a></div>
-    </section>`);
-  }
-});
-const schemaLd = {
-  '@context': 'https://schema.org',
-  '@type': 'TechArticle',
-  headline: 'Mondial-Datenbank: Schema und Tabellen',
-  inLanguage: 'de',
-  url: `${SITE_URL}/schema/`,
-  about: { '@type': 'Dataset', name: 'MONDIAL', creator: { '@type': 'Person', name: 'Wolfgang May' }, license: MONDIAL.license, url: MONDIAL.homepage },
-};
-emit('schema/index.html', page({
-  title: `Mondial-Datenbank Schema: alle ${tableCount} Tabellen und Spalten | ${SITE.name}`,
-  description: `Das Schema der MONDIAL-Datenbank: alle ${tableCount} Tabellen wie Country, City, Province, River und borders mit Spalten, Primärschlüsseln und Verknüpfungen.`,
-  path: 'schema/', jsonld: schemaLd, current: 'schema', body: schemaBody.join('\n'),
-}));
-
-// ------------------------------------------------------------------ Aufgaben-Seite
 const taskTotal = LEVELS.reduce((n, l) => n + l.tasks.length, 0);
-const tasksBody = [];
-tasksBody.push(`    <h1>SQL-Übungsaufgaben mit Lösungen</h1>
-    <p class="lead">${taskTotal} Aufgaben zur MONDIAL-Datenbank, vom einfachen SELECT bis zur korrelierten Unterabfrage. Jede Aufgabe hat einen Hinweis und eine geprüfte Musterlösung. „Im Trainer lösen“ öffnet die Aufgabe direkt im Editor.</p>
-    <nav class="toc" aria-label="Schwierigkeit">${LEVELS.map((l, i) => `<a href="#stufe-${i + 1}">${esc(l.title)}</a>`).join('')}</nav>`);
-LEVELS.forEach((l, li) => {
-  tasksBody.push(`\n    <h2 id="stufe-${li + 1}">${esc(l.title)}</h2>\n    <p class="sub">${esc(l.intro)}</p>`);
-  for (const t of l.tasks) {
-    const start = `-- Aufgabe: ${t.task}\n\n`;
-    tasksBody.push(`    <section class="card" id="${t.id}">
+const template = read('web/index.html');
+
+for (const L of LANGS) {
+  const ui = UI[L];
+
+  // ---------------------------------------------------------------- Startseite
+  const homeLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebApplication',
+        name: SITE.name,
+        url: pageUrl(PATHS.home[L]),
+        description: HOME[L].description,
+        inLanguage: L,
+        applicationCategory: 'EducationalApplication',
+        operatingSystem: 'Browser',
+        isAccessibleForFree: true,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+        learningResourceType: ui.learningType,
+        teaches: 'SQL',
+        about: datasetLd,
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: FAQ[L].map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+      },
+    ],
+  };
+  const vars = { lang: L, h1: HOME[L].h1, sub: HOME[L].sub, ...ui.app };
+  const home = template
+    .replace('<!--HEAD-->', head(L, { title: `${HOME[L].title} | ${SITE.name}`, description: HOME[L].description, alt: 'home', path: PATHS.home[L], jsonld: homeLd, keepHash: true }))
+    .replace('<!--TOPBAR-->', topbar(L, 'home', { tables: true, alt: 'home' }))
+    .replace('<!--FOOT-->', footer(L, { faq: true }))
+    .replace('<!--SCRIPTS-->', [
+      `<script src="${asset('assets/theme.js')}"></script>`,
+      `<script src="${asset('assets/sql-formatter.js')}"></script>`,
+      `<script src="${asset('vendor/sql-wasm.js')}"></script>`,
+      `<script src="${asset('assets/app.js')}"></script>`,
+    ].join('\n'))
+    .replace(/\{\{(\w+)\}\}/g, (m, k) => {
+      if (!(k in vars)) throw new Error(`Platzhalter {{${k}}} ohne Text (${L})`);
+      return esc(vars[k]);
+    });
+  if (/<!--[A-Z]+-->/.test(home)) throw new Error('Platzhalter in index.html nicht ersetzt');
+  emit(PATHS.home[L] + 'index.html', home);
+
+  // ---------------------------------------------------------------- Schema-Seite
+  const sx = ui.schema;
+  const anchor = (t) => t.toLowerCase();
+  const schemaBody = [];
+  schemaBody.push(`    <h1>${esc(sx.h1)}</h1>
+    <p class="lead">${sx.leadHtml(tableCount)}</p>
+    <nav class="toc" aria-label="${sx.tocAria}">${TABLE_GROUPS.map((g, i) => `<a href="#${sx.groupAnchor}-${i + 1}">${esc(g.title[L])}</a>`).join('')}</nav>`);
+  TABLE_GROUPS.forEach((g, gi) => {
+    schemaBody.push(`\n    <h2 id="${sx.groupAnchor}-${gi + 1}">${esc(g.title[L])}</h2>`);
+    for (const name of g.tables) {
+      const t = TABLES[name];
+      const out = ER.ER_EDGES.filter(e => e[0] === name);
+      const inc = [...new Set(ER.ER_EDGES.filter(e => e[1] === name && e[0] !== name).map(e => e[0]))];
+      const rel = [
+        ...out.map(e => `<li>→ <a href="#${anchor(e[1])}">${esc(e[1])}</a>: ${esc(ER.edgeVia(e[2], L))}</li>`),
+        inc.length ? `<li>← ${sx.referencedBy} ${inc.map(n => `<a href="#${anchor(n)}">${esc(n)}</a>`).join(', ')}</li>` : '',
+      ].filter(Boolean).join('');
+      schemaBody.push(`    <section class="card" id="${anchor(name)}">
+      <h3>${esc(name)}</h3>
+      <p class="meta">${t.rows.toLocaleString(ui.numberLocale)} ${sx.rows}${t.pk.length ? ` · ${sx.pk}: ${esc(t.pk.join(', '))}` : ''}</p>
+      <p>${esc(TABLE_INFO[L][name])}</p>
+      <table class="cols">
+        <thead><tr><th>${sx.column}</th><th>${sx.type}</th></tr></thead>
+        <tbody>${t.columns.map(c => `<tr><td>${esc(c.name)}${t.pk.includes(c.name) ? ` <span class="key" title="${sx.pkTitle}">PK</span>` : ''}</td><td class="type">${esc(c.type)}</td></tr>`).join('')}</tbody>
+      </table>${rel ? `\n      <ul class="rel">${rel}</ul>` : ''}
+      <div class="actions"><a href="${trainerLink(L, `SELECT *\nFROM ${name}\nLIMIT 20;`)}">${sx.open}</a></div>
+    </section>`);
+    }
+  });
+  emit(PATHS.schema[L] + 'index.html', page(L, {
+    title: `${sx.title(tableCount)} | ${SITE.name}`,
+    description: sx.description(tableCount),
+    path: PATHS.schema[L], alt: 'schema', current: 'schema', keepHash: true, body: schemaBody.join('\n'),
+    jsonld: {
+      '@context': 'https://schema.org', '@type': 'TechArticle',
+      headline: sx.h1, inLanguage: L, url: pageUrl(PATHS.schema[L]), about: datasetLd,
+    },
+  }));
+
+  // ---------------------------------------------------------------- Aufgaben-Seite
+  const tx = ui.tasks;
+  const levels = LEVELS.map(l => ({ ...pick(L, l), tasks: l.tasks.map(t => pick(L, t)) }));
+  const tasksBody = [];
+  tasksBody.push(`    <h1>${esc(tx.h1)}</h1>
+    <p class="lead">${tx.leadHtml(taskTotal)}</p>
+    <nav class="toc" aria-label="${tx.tocAria}">${levels.map((l, i) => `<a href="#${tx.levelAnchor}-${i + 1}">${esc(l.title)}</a>`).join('')}</nav>`);
+  levels.forEach((l, li) => {
+    tasksBody.push(`\n    <h2 id="${tx.levelAnchor}-${li + 1}">${esc(l.title)}</h2>\n    <p class="sub">${esc(l.intro)}</p>`);
+    for (const t of l.tasks) {
+      const start = `-- ${tx.comment}: ${t.task}\n\n`;
+      tasksBody.push(`    <section class="card" id="${t.id}">
       <h3>${esc(t.title)}</h3>
       <p>${esc(t.task)}</p>
-      <details><summary>Hinweis</summary><p class="note">${esc(t.hint)}</p></details>
-      <details><summary>Lösung</summary><pre><code>${esc(t.solution)}</code></pre>${t.note ? `<p class="note">${esc(t.note)}</p>` : ''}</details>
-      <div class="actions"><a href="${trainerLink(start)}">Im Trainer lösen →</a><a href="${trainerLink(t.solution)}">Lösung im Trainer öffnen</a></div>
+      <details><summary>${tx.hint}</summary><p class="note">${esc(t.hint)}</p></details>
+      <details><summary>${tx.solution}</summary><pre><code>${esc(t.solution)}</code></pre>${t.note ? `<p class="note">${esc(t.note)}</p>` : ''}</details>
+      <div class="actions"><a href="${trainerLink(L, start)}">${tx.solve}</a><a href="${trainerLink(L, t.solution)}">${tx.openSolution}</a></div>
     </section>`);
-  }
-});
-const tasksLd = {
-  '@context': 'https://schema.org',
-  '@type': 'LearningResource',
-  name: 'SQL-Übungsaufgaben zur Mondial-Datenbank',
-  inLanguage: 'de',
-  url: `${SITE_URL}/aufgaben/`,
-  learningResourceType: 'Übungsaufgaben',
-  teaches: 'SQL: SELECT, WHERE, JOIN, GROUP BY, HAVING, Unterabfragen',
-  isAccessibleForFree: true,
-  hasPart: LEVELS.flatMap(l => l.tasks.map(t => ({ '@type': 'LearningResource', name: t.title, url: `${SITE_URL}/aufgaben/#${t.id}` }))),
-};
-emit('aufgaben/index.html', page({
-  title: `SQL-Übungsaufgaben mit Lösungen zur Mondial-Datenbank | ${SITE.name}`,
-  description: `${taskTotal} SQL-Aufgaben zur MONDIAL-Datenbank mit Hinweisen und Lösungen: SELECT, JOIN, GROUP BY, HAVING und Unterabfragen. Direkt im Browser lösen.`,
-  path: 'aufgaben/', jsonld: tasksLd, current: 'aufgaben', body: tasksBody.join('\n'),
-}));
+    }
+  });
+  emit(PATHS.tasks[L] + 'index.html', page(L, {
+    title: `${tx.title} | ${SITE.name}`,
+    description: tx.description(taskTotal),
+    path: PATHS.tasks[L], alt: 'tasks', current: 'tasks', body: tasksBody.join('\n'),
+    jsonld: {
+      '@context': 'https://schema.org', '@type': 'LearningResource',
+      name: tx.ldName, inLanguage: L, url: pageUrl(PATHS.tasks[L]),
+      learningResourceType: tx.ldType, teaches: tx.ldTeaches, isAccessibleForFree: true,
+      hasPart: levels.flatMap(l => l.tasks.map(t => ({ '@type': 'LearningResource', name: t.title, url: `${pageUrl(PATHS.tasks[L])}#${t.id}` }))),
+    },
+  }));
 
-// ------------------------------------------------------------------ 404
-const notFound = page({
-  title: `Seite nicht gefunden | ${SITE.name}`,
-  description: 'Diese Seite gibt es nicht.',
-  path: '404', current: '',
-  body: `    <h1>Seite nicht gefunden</h1>
-    <p class="lead">Diese Adresse gibt es nicht (mehr).</p>
-    <p><a href="/">Zum SQL-Trainer</a> · <a href="/aufgaben/">Aufgaben</a> · <a href="/schema/">Schema</a></p>`,
-}).replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="robots" content="noindex">');
-emit('404.html', notFound);
+  // ---------------------------------------------------------------- 404 (Cloudflare nimmt die nächstgelegene 404.html)
+  const nf = ui.notFound;
+  emit(PATHS.home[L] + '404.html', page(L, {
+    title: `${nf.title} | ${SITE.name}`, description: nf.description, path: PATHS.home[L] + '404', alt: null, current: '',
+    body: `    <h1>${esc(nf.title)}</h1>
+    <p class="lead">${esc(nf.lead)}</p>
+    <p><a href="/${PATHS.home[L]}">${esc(nf.back)}</a> · <a href="/${PATHS.tasks[L]}">${esc(ui.navTasks)}</a> · <a href="/${PATHS.schema[L]}">${esc(ui.navSchema)}</a></p>`,
+  }).replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="robots" content="noindex">'));
+}
 
 // ------------------------------------------------------------------ sitemap, robots, headers
-const urls = ['', 'aufgaben/', 'schema/'];
+const sitemapEntries = Object.values(PATHS).flatMap(p => LANGS.map(L => `  <url>
+    <loc>${pageUrl(p[L])}</loc>
+    <lastmod>${TODAY}</lastmod>
+${LANGS.map(x => `    <xhtml:link rel="alternate" hreflang="${x}" href="${pageUrl(p[x])}"/>`).join('\n')}
+    <xhtml:link rel="alternate" hreflang="x-default" href="${pageUrl(p.de)}"/>
+  </url>`));
 emit('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map(u => `  <url><loc>${SITE_URL}/${u}</loc><lastmod>${TODAY}</lastmod></url>`).join('\n')}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+${sitemapEntries.join('\n')}
 </urlset>
 `);
 emit('robots.txt', `# Alle Crawler sind willkommen, auch Suchmaschinen und KI-Assistenten.
@@ -378,4 +422,4 @@ emit('_headers', `/*
 const size = (rel) => (fs.statSync(path.join(OUT, rel)).size / 1024).toFixed(0) + ' KB';
 console.log(`dist/ gebaut für ${SITE_URL}`);
 console.log(`  index.html ${size('index.html')}, app.js ${size('assets/app.js')}, Datenbank ${size('data/mondial.sqlite')}`);
-console.log(`  ${tableCount} Tabellen, ${taskTotal} Aufgaben geprüft`);
+console.log(`  ${tableCount} Tabellen, ${taskTotal} Aufgaben geprüft, Sprachen: ${LANGS.join(', ')}`);

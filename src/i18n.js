@@ -1,0 +1,118 @@
+// Texte der App in beiden Sprachen. Die Sprache kommt aus <html lang>.
+const LANG = document.documentElement.lang === 'en' ? 'en' : 'de';
+const T = {
+  de: {
+    insertTitle: (t) => 'SELECT * FROM ' + t + ' einfügen',
+    noRows: 'Abfrage erfolgreich ausgeführt, keine Ergebniszeilen.',
+    rows: (n) => n + ' Zeile(n)',
+    resultN: (i, n) => 'Ergebnis ' + i + ', ' + n + ' Zeile(n)',
+    hiddenRows: (n) => n + ' weitere Zeile(n) ausgeblendet.',
+    colsOfTables: 'Spalten der benutzten Tabellen, ',
+    kindColumn: 'Spalte', kindTable: 'Tabelle', kindFunction: 'Funktion', kindKeyword: 'Schlüsselwort',
+    didYouMean: 'Meintest du ', or: ' oder ',
+    replaceTitle: (a, b) => '„' + a + '“ durch „' + b + '“ ersetzen',
+    tapToReplace: (k) => '  (' + k + ' antippen zum Ersetzen)',
+    detectTitle: (s) => 'Erkennung der benutzten Tabellen läuft aktuell über: ' + s,
+    erHeading: 'Tabellen &amp; Beziehungen',
+    zoomOut: 'Verkleinern', zoomIn: 'Vergrößern', zoomReset: 'Zurücksetzen',
+    erHint: 'ziehen &middot; scrollen zum Zoomen &middot; Tabelle antippen zeigt Spalten',
+    joinPath: 'Verknüpfungspfad der Abfrage',
+    noDirectLink: 'Keine direkte Verknüpfung zwischen den benutzten Tabellen hinterlegt. Evtl. über eine Zwischentabelle joinen.',
+    notInDiagram: 'Nicht im Diagramm (dennoch nutzbar): ',
+    erDefault: 'Standard: nur Titel &amp; Verbindungslinien. Tippe eine Tabelle an oder nutze sie in der Query, um ihre Spalten und den Join-Pfad zu sehen.',
+    pipeHeading: 'Logische Abarbeitungsreihenfolge',
+    pipeHint: 'Schreib eine Abfrage, die genutzten Schritte werden hier hervorgehoben.',
+    pipe: {
+      from: 'Ausgangstabelle(n) festlegen und verknüpfen', where: 'Zeilen vor der Gruppierung filtern',
+      group: 'Zeilen zu Gruppen zusammenfassen', having: 'Gruppen nach Aggregation filtern',
+      select: 'Spalten fürs Ergebnis auswählen/berechnen', distinct: 'Doppelte Zeilen entfernen',
+      order: 'Ergebnis sortieren', limit: 'Anzahl der Zeilen begrenzen',
+    },
+    executed: (ms) => 'Ausgeführt in ' + ms + ' ms.',
+    truncated: '\n… (gekürzt)',
+    ask: {
+      intro: 'Ich lerne SQL und übe mit der MONDIAL-Geodatenbank (Länder, Städte, Flüsse, Berge, Organisationen usw.). '
+        + 'Die Abfragen laufen in SQLite (sql.js im Browser), also gilt der SQLite-Dialekt.\n\n',
+      empty: 'Ich habe noch keine Abfrage geschrieben. Gib mir bitte eine kleine Übungsaufgabe mit der MONDIAL-Datenbank '
+        + 'und erkläre kurz, welche Tabellen ich dafür brauche, aber verrate die Lösung noch nicht.\n\n',
+      tables: 'Verfügbare Tabellen: ',
+      query: 'Meine Abfrage:\n',
+      error: 'Fehlermeldung der Datenbank:\n',
+      noRows: 'Die Abfrage lief ohne Fehler, hat aber keine Zeilen zurückgegeben.\n\n',
+      rows: (n) => 'Die Abfrage lief ohne Fehler und lieferte ' + n + ' Zeile(n). Die ersten Zeilen:\n',
+      notRun: '(Ich habe die Abfrage noch nicht ausgeführt.)\n\n',
+      schema: 'Relevante Tabellen mit Spalten:\n',
+      explainError: 'Erkläre mir bitte auf Deutsch, locker und direkt, WARUM die Abfrage nicht funktioniert. '
+        + 'Erkläre das SQL-Konzept, das hier schiefläuft, statt nur die fertige Lösung hinzuschreiben. '
+        + 'Gib mir dann einen Hinweis, wie ich es selbst beheben kann. Die korrigierte Abfrage zeigst du erst am Ende.',
+      explainEmpty: 'Erkläre mir bitte auf Deutsch, warum hier vermutlich nichts zurückkommt '
+        + '(z. B. falsche Bedingung, Groß-/Kleinschreibung, falsche Spalte im JOIN) und wie ich das prüfen kann.',
+      explainOk: 'Erkläre mir bitte auf Deutsch Schritt für Schritt, was diese Abfrage macht, '
+        + 'ob sie logisch das tut, was man vermutlich will, und was man besser oder einfacher schreiben könnte.',
+    },
+    justNow: 'gerade',
+    historyEmpty: 'Noch nichts ausgeführt.',
+    historyCount: (n, max) => n + ' von max. ' + max + ' · ⌘/Strg + ↑ / ↓',
+    historyClear: 'Verlauf löschen',
+    formatFail: 'Formatieren klappt erst, wenn die Abfrage vollständig ist.',
+    dbLoading: 'Datenbank wird geladen…',
+    dbFail: (m) => 'Die Datenbank konnte nicht geladen werden (' + m + '). Lade die Seite neu.',
+  },
+  en: {
+    insertTitle: (t) => 'Insert SELECT * FROM ' + t,
+    noRows: 'Query ran successfully, no rows returned.',
+    rows: (n) => n + (n === 1 ? ' row' : ' rows'),
+    resultN: (i, n) => 'Result ' + i + ', ' + n + (n === 1 ? ' row' : ' rows'),
+    hiddenRows: (n) => n + ' more ' + (n === 1 ? 'row' : 'rows') + ' hidden.',
+    colsOfTables: 'Columns of the tables you used: ',
+    kindColumn: 'column', kindTable: 'table', kindFunction: 'function', kindKeyword: 'keyword',
+    didYouMean: 'Did you mean ', or: ' or ',
+    replaceTitle: (a, b) => 'Replace “' + a + '” with “' + b + '”',
+    tapToReplace: (k) => '  (click the ' + k + ' to replace it)',
+    detectTitle: (s) => 'Tables used by the query are currently detected via: ' + s,
+    erHeading: 'Tables &amp; relationships',
+    zoomOut: 'Zoom out', zoomIn: 'Zoom in', zoomReset: 'Reset',
+    erHint: 'drag &middot; scroll to zoom &middot; click a table to see its columns',
+    joinPath: 'Join path of the query',
+    noDirectLink: 'No direct link between the tables you used. You may need to join through an intermediate table.',
+    notInDiagram: 'Not in the diagram (still usable): ',
+    erDefault: 'Default: table names and links only. Click a table or use it in your query to see its columns and the join path.',
+    pipeHeading: 'Logical order of evaluation',
+    pipeHint: 'Write a query and the steps it uses are highlighted here.',
+    pipe: {
+      from: 'Pick the source table(s) and join them', where: 'Filter rows before grouping',
+      group: 'Combine rows into groups', having: 'Filter groups after aggregation',
+      select: 'Choose or compute the result columns', distinct: 'Remove duplicate rows',
+      order: 'Sort the result', limit: 'Limit the number of rows',
+    },
+    executed: (ms) => 'Ran in ' + ms + ' ms.',
+    truncated: '\n… (truncated)',
+    ask: {
+      intro: 'I am learning SQL and practicing with the MONDIAL geography database (countries, cities, rivers, mountains, organizations, etc.). '
+        + 'The queries run in SQLite (sql.js in the browser), so the SQLite dialect applies.\n\n',
+      empty: 'I have not written a query yet. Please give me a small exercise using the MONDIAL database '
+        + 'and briefly explain which tables I need, but do not reveal the solution yet.\n\n',
+      tables: 'Available tables: ',
+      query: 'My query:\n',
+      error: 'Error message from the database:\n',
+      noRows: 'The query ran without errors but returned no rows.\n\n',
+      rows: (n) => 'The query ran without errors and returned ' + n + (n === 1 ? ' row' : ' rows') + '. The first rows:\n',
+      notRun: '(I have not run the query yet.)\n\n',
+      schema: 'Relevant tables with columns:\n',
+      explainError: 'Please explain in plain, direct English WHY the query does not work. '
+        + 'Explain the SQL concept that goes wrong here instead of just writing the finished solution. '
+        + 'Then give me a hint so I can fix it myself. Only show the corrected query at the very end.',
+      explainEmpty: 'Please explain why this probably returns nothing '
+        + '(e.g. wrong condition, upper/lower case, wrong column in the JOIN) and how I can check that.',
+      explainOk: 'Please explain step by step what this query does, '
+        + 'whether it logically does what it is probably meant to do, and what could be written better or more simply.',
+    },
+    justNow: 'now',
+    historyEmpty: 'Nothing run yet.',
+    historyCount: (n, max) => n + ' of max. ' + max + ' · ⌘/Ctrl + ↑ / ↓',
+    historyClear: 'Clear history',
+    formatFail: 'Formatting only works once the query is complete.',
+    dbLoading: 'Loading database…',
+    dbFail: (m) => 'The database could not be loaded (' + m + '). Please reload the page.',
+  },
+}[LANG];

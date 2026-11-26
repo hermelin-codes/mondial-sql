@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{lang}}">
 <head>
 <!--HEAD-->
 </head>
@@ -17,14 +17,14 @@
       <div class="editor-wrap">
         <div class="editor-input">
           <pre id="sql-highlight" aria-hidden="true"></pre>
-          <textarea id="sql-input" aria-label="SQL-Abfrage" placeholder="SELECT * FROM Country WHERE Population > 50000000 ORDER BY Population DESC;" spellcheck="false"></textarea>
+          <textarea id="sql-input" aria-label="{{sqlLabel}}" placeholder="SELECT * FROM Country WHERE Population > 50000000 ORDER BY Population DESC;" spellcheck="false"></textarea>
         </div>
         <div class="editor-footer">
-          <button class="run" id="run-btn">Ausführen</button>
-          <span class="hint">⌘/Strg + Enter</span>
+          <button class="run" id="run-btn">{{run}}</button>
+          <span class="hint">{{runHint}}</span>
           <div class="editor-tools">
-            <button type="button" class="tool-btn" id="format-btn" title="Abfrage einrücken und Schlüsselwörter großschreiben (mit Strg+Z rückgängig)">Formatieren</button>
-            <button type="button" class="tool-btn" id="history-btn" title="Frühere Abfragen · auch mit ⌘/Strg + ↑ / ↓ im Editor">Verlauf</button>
+            <button type="button" class="tool-btn" id="format-btn" title="{{formatTitle}}">{{format}}</button>
+            <button type="button" class="tool-btn" id="history-btn" title="{{historyTitle}}">{{history}}</button>
             <div class="history-panel" id="history-panel" style="display:none;"></div>
           </div>
           <div class="tool-msg" id="tool-msg"></div>
@@ -32,9 +32,9 @@
       </div>
 
       <div class="ask-row">
-        <span class="ask-label">Hilfe:</span>
-        <a class="ask-btn gpt" id="ask-gpt" href="https://chatgpt.com/" target="_blank" rel="noopener"><span class="dot"></span>ChatGPT fragen</a>
-        <a class="ask-btn claude" id="ask-claude" href="https://claude.ai/new" target="_blank" rel="noopener"><span class="dot"></span>Claude fragen</a>
+        <span class="ask-label">{{help}}</span>
+        <a class="ask-btn gpt" id="ask-gpt" href="https://chatgpt.com/" target="_blank" rel="noopener"><span class="dot"></span>{{askGpt}}</a>
+        <a class="ask-btn claude" id="ask-claude" href="https://claude.ai/new" target="_blank" rel="noopener"><span class="dot"></span>{{askClaude}}</a>
       </div>
 
       <div class="results-col">
@@ -46,8 +46,8 @@
 
     <div class="viz-col">
       <div class="viz-tabs">
-        <button type="button" class="viz-tab active" data-viz="er">Tabellen</button>
-        <button type="button" class="viz-tab" data-viz="pipeline">Ablauf</button>
+        <button type="button" class="viz-tab active" data-viz="er">{{tabTables}}</button>
+        <button type="button" class="viz-tab" data-viz="pipeline">{{tabPipeline}}</button>
       </div>
       <div id="viz-er" class="viz-panel"></div>
       <div id="viz-pipeline" class="viz-panel" style="display:none;"></div>

@@ -46,7 +46,7 @@ function renderTableList(tables) {
     const insertBtn = document.createElement('button');
     insertBtn.className = 'insert-btn';
     insertBtn.textContent = 'SELECT';
-    insertBtn.title = 'SELECT * FROM ' + t.name + ' einfügen';
+    insertBtn.title = T.insertTitle(t.name);
     insertBtn.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -77,7 +77,7 @@ function renderResults(results) {
     const p = document.createElement('div');
     p.className = 'status-line';
     p.style.display = 'block';
-    p.textContent = 'Abfrage erfolgreich ausgeführt, keine Ergebniszeilen.';
+    p.textContent = T.noRows;
     container.appendChild(p);
     return;
   }
@@ -88,8 +88,8 @@ function renderResults(results) {
     const maxRows = 500;
     const shown = Math.min(res.values.length, maxRows);
     h3.textContent = results.length > 1
-      ? 'Ergebnis ' + (idx + 1) + ', ' + res.values.length + ' Zeile(n)'
-      : res.values.length + ' Zeile(n)';
+      ? T.resultN(idx + 1, res.values.length)
+      : T.rows(res.values.length);
     wrap.appendChild(h3);
     const scrollDiv = document.createElement('div');
     scrollDiv.className = 'table-scroll';
@@ -120,7 +120,7 @@ function renderResults(results) {
     if (res.values.length > maxRows) {
       const note = document.createElement('div');
       note.className = 'truncate-note';
-      note.textContent = (res.values.length - maxRows) + ' weitere Zeile(n) ausgeblendet.';
+      note.textContent = T.hiddenRows(res.values.length - maxRows);
       wrap.appendChild(note);
     }
     container.appendChild(wrap);
@@ -201,20 +201,20 @@ function buildSuggestion(query, message) {
     const all = [];
     Object.values(TABLE_COLUMNS).forEach(cols => cols.forEach(c => all.push(columnName(c))));
     options = closestNames(col, all, preferred).map(c => prefix + c);
-    kind = 'Spalte';
+    kind = T.kindColumn;
     if (!options.length && usedTables.length) {
       const inTables = usedTables.map(t => t + ': ' + (TABLE_COLUMNS[t] || []).map(columnName).join(', '));
-      return makeHint(null, null, 'Spalten der benutzten Tabellen, ' + inTables.join(' · '));
+      return makeHint(null, null, T.colsOfTables + inTables.join(' · '));
     }
   } else if ((m = message.match(/no such table: (.+)$/i))) {
     wrong = m[1].trim().replace(/^main\./i, '');
     options = closestNames(wrong, ALL_TABLE_NAMES);
-    kind = 'Tabelle';
+    kind = T.kindTable;
   } else if ((m = message.match(/no such function: (.+)$/i))) {
     wrong = m[1].trim();
     const known = FUNC_EQUIVALENTS[wrong.toLowerCase()];
     options = known ? [known] : closestNames(wrong, SQLITE_FUNCS).map(f => f.toUpperCase());
-    kind = 'Funktion';
+    kind = T.kindFunction;
   } else if (/syntax error/i.test(message)) {
     // SQLite meldet oft das Wort NACH dem Tippfehler ("SELECT Name FORM Country" -> near "Country"),
     // weil es "FORM" fuer einen Alias haelt. Daher alle Woerter der Abfrage gegen Schluesselwoerter pruefen.
@@ -227,7 +227,7 @@ function buildSuggestion(query, message) {
       if (w.length < 4 || known.has(w.toLowerCase()) || SQL_SUGGEST_KEYWORDS.includes(w.toUpperCase())) continue;
       const hit = closestNames(w, SQL_SUGGEST_KEYWORDS);
       if (hit.length && editDistance(w, hit[0]) <= (w.length >= 6 ? 2 : 1)) {
-        wrong = w; options = [hit[0]]; kind = 'Schlüsselwort';
+        wrong = w; options = [hit[0]]; kind = T.kindKeyword;
         break;
       }
     }
@@ -243,20 +243,20 @@ function makeHint(wrong, options, plainText, kind) {
     div.innerHTML = '<span class="muted">' + escapeHtml(plainText) + '</span>';
     return div;
   }
-  div.appendChild(document.createTextNode('Meintest du '));
+  div.appendChild(document.createTextNode(T.didYouMean));
   options.forEach((opt, i) => {
-    if (i > 0) div.appendChild(document.createTextNode(i === options.length - 1 ? ' oder ' : ', '));
+    if (i > 0) div.appendChild(document.createTextNode(i === options.length - 1 ? T.or : ', '));
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = opt;
-    b.title = '„' + wrong + '“ durch „' + opt + '“ ersetzen';
+    b.title = T.replaceTitle(wrong, opt);
     b.onclick = () => replaceInEditor(wrong, opt);
     div.appendChild(b);
   });
   div.appendChild(document.createTextNode('?'));
   const note = document.createElement('span');
   note.className = 'muted';
-  note.textContent = '  (' + kind + ' antippen zum Ersetzen)';
+  note.textContent = T.tapToReplace(kind);
   div.appendChild(note);
   return div;
 }
@@ -484,7 +484,7 @@ function renderERDiagram(sql) {
 
     if (a === b) { // Selbstbezug (River.River)
       const x = pa.x + pa.w, y = pa.y + (pa.open ? ER_HEAD_H / 2 : pa.h / 2);
-      edgesSvg += `<path d="M ${x} ${y - 5} C ${x + 26} ${y - 12}, ${x + 26} ${y + 12}, ${x} ${y + 5}" fill="none" stroke="${stroke}" stroke-width="${sw}"><title>${escapeHtml(via)}</title></path>`;
+      edgesSvg += `<path d="M ${x} ${y - 5} C ${x + 26} ${y - 12}, ${x + 26} ${y + 12}, ${x} ${y + 5}" fill="none" stroke="${stroke}" stroke-width="${sw}"><title>${escapeHtml(edgeVia(via, LANG))}</title></path>`;
       continue;
     }
     const A = anchor(pa, pb.col), B = anchor(pb, pa.col);
@@ -496,7 +496,7 @@ function renderERDiagram(sql) {
       const mx = (A.x + B.x) / 2;
       d = `M ${A.x} ${A.y} C ${mx} ${A.y}, ${mx} ${B.y}, ${B.x} ${B.y}`;
     }
-    edgesSvg += `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}"><title>${escapeHtml(a)} → ${escapeHtml(b)}: ${escapeHtml(via)}</title></path>`;
+    edgesSvg += `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}"><title>${escapeHtml(a)} → ${escapeHtml(b)}: ${escapeHtml(edgeVia(via, LANG))}</title></path>`;
   }
 
   // Knoten
@@ -539,54 +539,54 @@ function renderERDiagram(sql) {
 
   const statusLabel = lastDetectionSource === 'sql' ? 'SQL-Plan' : 'Regex-Fallback';
   const statusHtml = hasQuery
-    ? `<span class="detect-status" title="Erkennung der benutzten Tabellen läuft aktuell über: ${statusLabel}"><span class="detect-dot ${lastDetectionSource}"></span>${statusLabel}</span>`
+    ? `<span class="detect-status" title="${T.detectTitle(statusLabel)}"><span class="detect-dot ${lastDetectionSource}"></span>${statusLabel}</span>`
     : '';
 
-  let html = `<div class="viz-heading"><span>Tabellen &amp; Beziehungen</span>${statusHtml}</div>
+  let html = `<div class="viz-heading"><span>${T.erHeading}</span>${statusHtml}</div>
     <div class="er-canvas" id="er-canvas-wrap">${svg}</div>
     <div class="er-controls">
-      <button type="button" class="er-zoom-btn" id="er-zoom-out" title="Verkleinern">&minus;</button>
-      <button type="button" class="er-zoom-btn" id="er-zoom-in" title="Vergrößern">+</button>
-      <button type="button" class="er-zoom-btn" id="er-zoom-reset" title="Zurücksetzen">Reset</button>
-      <span class="er-hint-text">ziehen &middot; scrollen zum Zoomen &middot; Tabelle antippen zeigt Spalten</span>
+      <button type="button" class="er-zoom-btn" id="er-zoom-out" title="${T.zoomOut}">&minus;</button>
+      <button type="button" class="er-zoom-btn" id="er-zoom-in" title="${T.zoomIn}">+</button>
+      <button type="button" class="er-zoom-btn" id="er-zoom-reset" title="${T.zoomReset}">Reset</button>
+      <span class="er-hint-text">${T.erHint}</span>
     </div>`;
 
   if (activePath.length) {
-    html += `<div class="path-block"><div class="path-title">Verknüpfungspfad der Abfrage</div>`;
+    html += `<div class="path-block"><div class="path-title">${T.joinPath}</div>`;
     for (const [a, b, via] of activePath) {
-      html += `<div class="path-row"><span class="path-pair">${escapeHtml(a)} ↔ ${escapeHtml(b)}</span><span class="path-via">${escapeHtml(via)}</span></div>`;
+      html += `<div class="path-row"><span class="path-pair">${escapeHtml(a)} ↔ ${escapeHtml(b)}</span><span class="path-via">${escapeHtml(edgeVia(via, LANG))}</span></div>`;
     }
     html += `</div>`;
   } else if (hasQuery && usedInDiagram.size > 1) {
-    html += `<div class="viz-extra">Keine direkte Verknüpfung zwischen den benutzten Tabellen hinterlegt. Evtl. über eine Zwischentabelle joinen.</div>`;
+    html += `<div class="viz-extra">${T.noDirectLink}</div>`;
   }
 
   if (extra.length) {
     const tags = extra.map(n => escapeHtml(n)).join(', ');
-    html += `<div class="viz-extra">Nicht im Diagramm (dennoch nutzbar): ${tags}</div>`;
+    html += `<div class="viz-extra">${T.notInDiagram}${tags}</div>`;
   }
   if (!hasQuery) {
-    html += `<div class="viz-hint">Standard: nur Titel &amp; Verbindungslinien. Tippe eine Tabelle an oder nutze sie in der Query, um ihre Spalten und den Join-Pfad zu sehen.</div>`;
+    html += `<div class="viz-hint">${T.erDefault}</div>`;
   }
 
   el.innerHTML = html;
 }
 
 const PIPELINE_STEPS = [
-  { label: 'FROM / JOIN', test: /\bFROM\b/i, desc: 'Ausgangstabelle(n) festlegen und verknüpfen' },
-  { label: 'WHERE', test: /\bWHERE\b/i, desc: 'Zeilen vor der Gruppierung filtern' },
-  { label: 'GROUP BY', test: /\bGROUP\s+BY\b/i, desc: 'Zeilen zu Gruppen zusammenfassen' },
-  { label: 'HAVING', test: /\bHAVING\b/i, desc: 'Gruppen nach Aggregation filtern' },
-  { label: 'SELECT', test: /\bSELECT\b/i, desc: 'Spalten fürs Ergebnis auswählen/berechnen' },
-  { label: 'DISTINCT', test: /\bDISTINCT\b/i, desc: 'Doppelte Zeilen entfernen' },
-  { label: 'ORDER BY', test: /\bORDER\s+BY\b/i, desc: 'Ergebnis sortieren' },
-  { label: 'LIMIT', test: /\bLIMIT\b/i, desc: 'Anzahl der Zeilen begrenzen' },
+  { label: 'FROM / JOIN', test: /\bFROM\b/i, desc: T.pipe.from },
+  { label: 'WHERE', test: /\bWHERE\b/i, desc: T.pipe.where },
+  { label: 'GROUP BY', test: /\bGROUP\s+BY\b/i, desc: T.pipe.group },
+  { label: 'HAVING', test: /\bHAVING\b/i, desc: T.pipe.having },
+  { label: 'SELECT', test: /\bSELECT\b/i, desc: T.pipe.select },
+  { label: 'DISTINCT', test: /\bDISTINCT\b/i, desc: T.pipe.distinct },
+  { label: 'ORDER BY', test: /\bORDER\s+BY\b/i, desc: T.pipe.order },
+  { label: 'LIMIT', test: /\bLIMIT\b/i, desc: T.pipe.limit },
 ];
 
 function renderPipeline(sql) {
   const el = document.getElementById('viz-pipeline');
   const text = sql || '';
-  let html = `<div class="viz-heading">Logische Abarbeitungsreihenfolge</div><div class="pipeline">`;
+  let html = `<div class="viz-heading">${T.pipeHeading}</div><div class="pipeline">`;
   PIPELINE_STEPS.forEach((step, i) => {
     const active = step.test.test(text);
     html += `<div class="pipe-step ${active ? 'active' : ''}">
@@ -602,7 +602,7 @@ function renderPipeline(sql) {
   });
   html += `</div>`;
   if (!text.trim()) {
-    html += `<div class="viz-hint">Schreib eine Abfrage, die genutzten Schritte werden hier hervorgehoben.</div>`;
+    html += `<div class="viz-hint">${T.pipeHint}</div>`;
   }
   el.innerHTML = html;
 }
@@ -716,7 +716,7 @@ function runQuery() {
     addToHistory(sql, true);
     const elapsed = (performance.now() - start).toFixed(1);
     statusLine.style.display = 'block';
-    statusLine.textContent = 'Ausgeführt in ' + elapsed + ' ms.';
+    statusLine.textContent = T.executed(elapsed);
     renderResults(results);
   } catch (err) {
     lastRun = { sql, error: err.message || String(err), results: null };
@@ -807,52 +807,45 @@ function buildAskPrompt() {
   const MAX_SQL = 2500;
   let sql = document.getElementById('sql-input').value.trim();
   const run = lastRun && lastRun.sql === sql ? lastRun : null;
-  if (sql.length > MAX_SQL) sql = sql.slice(0, MAX_SQL) + '\n… (gekürzt)';
+  if (sql.length > MAX_SQL) sql = sql.slice(0, MAX_SQL) + T.truncated;
 
   const used = tablesInQuery(sql);
   const schema = used.map(t =>
     t + '(' + (TABLE_COLUMNS[t] || []).map(c => c.split(' ')[0]).join(', ') + ')'
   ).join('\n');
 
-  let p = 'Ich lerne SQL und übe mit der MONDIAL-Geodatenbank (Länder, Städte, Flüsse, Berge, Organisationen usw.). '
-        + 'Die Abfragen laufen in SQLite (sql.js im Browser), also gilt der SQLite-Dialekt.\n\n';
+  let p = T.ask.intro;
 
   if (!sql) {
-    p += 'Ich habe noch keine Abfrage geschrieben. Gib mir bitte eine kleine Übungsaufgabe mit der MONDIAL-Datenbank '
-       + 'und erkläre kurz, welche Tabellen ich dafür brauche, aber verrate die Lösung noch nicht.\n\n'
-       + 'Verfügbare Tabellen: ' + ALL_TABLE_NAMES.join(', ');
+    p += T.ask.empty + T.ask.tables + ALL_TABLE_NAMES.join(', ');
     return p;
   }
 
-  p += 'Meine Abfrage:\n' + sql + '\n\n';
+  p += T.ask.query + sql + '\n\n';
 
   if (run && run.error) {
-    p += 'Fehlermeldung der Datenbank:\n' + run.error + '\n\n';
+    p += T.ask.error + run.error + '\n\n';
   } else if (run && run.results) {
     if (run.results.length === 0) {
-      p += 'Die Abfrage lief ohne Fehler, hat aber keine Zeilen zurückgegeben.\n\n';
+      p += T.ask.noRows;
     } else {
       const r = run.results[run.results.length - 1];
-      p += 'Die Abfrage lief ohne Fehler und lieferte ' + r.values.length + ' Zeile(n). Die ersten Zeilen:\n'
+      p += T.ask.rows(r.values.length)
          + previewRows(r, 5) + '\n\n';
     }
   } else {
-    p += '(Ich habe die Abfrage noch nicht ausgeführt.)\n\n';
+    p += T.ask.notRun;
   }
 
-  if (schema) p += 'Relevante Tabellen mit Spalten:\n' + schema + '\n\n';
-  else p += 'Verfügbare Tabellen: ' + ALL_TABLE_NAMES.join(', ') + '\n\n';
+  if (schema) p += T.ask.schema + schema + '\n\n';
+  else p += T.ask.tables + ALL_TABLE_NAMES.join(', ') + '\n\n';
 
   if (run && run.error) {
-    p += 'Erkläre mir bitte auf Deutsch, locker und direkt, WARUM die Abfrage nicht funktioniert. '
-       + 'Erkläre das SQL-Konzept, das hier schiefläuft, statt nur die fertige Lösung hinzuschreiben. '
-       + 'Gib mir dann einen Hinweis, wie ich es selbst beheben kann. Die korrigierte Abfrage zeigst du erst am Ende.';
+    p += T.ask.explainError;
   } else if (run && run.results && run.results.length === 0) {
-    p += 'Erkläre mir bitte auf Deutsch, warum hier vermutlich nichts zurückkommt '
-       + '(z. B. falsche Bedingung, Groß-/Kleinschreibung, falsche Spalte im JOIN) und wie ich das prüfen kann.';
+    p += T.ask.explainEmpty;
   } else {
-    p += 'Erkläre mir bitte auf Deutsch Schritt für Schritt, was diese Abfrage macht, '
-       + 'ob sie logisch das tut, was man vermutlich will, und was man besser oder einfacher schreiben könnte.';
+    p += T.ask.explainOk;
   }
   return p;
 }
@@ -917,7 +910,7 @@ function stepHistory(dir) {
 
 function timeAgo(t) {
   const s = Math.round((Date.now() - t) / 1000);
-  if (s < 60) return 'gerade';
+  if (s < 60) return T.justNow;
   if (s < 3600) return Math.floor(s / 60) + ' min';
   if (s < 86400) return Math.floor(s / 3600) + ' h';
   return Math.floor(s / 86400) + ' d';
@@ -928,7 +921,7 @@ function renderHistoryPanel() {
   const h = loadHistory();
   panel.innerHTML = '';
   if (!h.length) {
-    panel.innerHTML = '<div class="history-empty">Noch nichts ausgeführt.</div>';
+    panel.innerHTML = '<div class="history-empty">' + T.historyEmpty + '</div>';
     return;
   }
   h.forEach((item, i) => {
@@ -948,10 +941,10 @@ function renderHistoryPanel() {
   });
   const foot = document.createElement('div');
   foot.className = 'history-foot';
-  foot.innerHTML = '<span>' + h.length + ' von max. ' + HISTORY_MAX + ' · ⌘/Strg + ↑ / ↓</span>';
+  foot.innerHTML = '<span>' + T.historyCount(h.length, HISTORY_MAX) + '</span>';
   const clear = document.createElement('button');
   clear.type = 'button';
-  clear.textContent = 'Verlauf löschen';
+  clear.textContent = T.historyClear;
   clear.onclick = (e) => {
     e.stopPropagation();
     saveHistory([]);
@@ -995,7 +988,7 @@ function formatEditor() {
   try {
     out = uppercaseKeywords(window.formatSqlite(sql)).replace(/\s+$/, '');
   } catch (err) {
-    msg.textContent = 'Formatieren klappt erst, wenn die Abfrage vollständig ist.';
+    msg.textContent = T.formatFail;
     setTimeout(() => { msg.textContent = ''; }, 4000);
     return;
   }
@@ -1063,7 +1056,7 @@ document.addEventListener('click', (e) => {
   const statusLine = document.getElementById('status-line');
   runBtn.disabled = true;
   statusLine.style.display = 'block';
-  statusLine.textContent = 'Datenbank wird geladen…';
+  statusLine.textContent = T.dbLoading;
 
   Promise.all([
     initSqlJs({ locateFile: file => ASSET_URLS[file] }),
@@ -1078,6 +1071,6 @@ document.addEventListener('click', (e) => {
     statusLine.textContent = '';
     updateViz(document.getElementById('sql-input').value);
   }).catch(err => {
-    statusLine.textContent = 'Die Datenbank konnte nicht geladen werden (' + err.message + '). Lade die Seite neu.';
+    statusLine.textContent = T.dbFail(err.message);
   });
 })();
